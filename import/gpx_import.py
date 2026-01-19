@@ -39,7 +39,7 @@ def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
 
     # Creates the initial spline
     # u is an NDArray that contains scipy's internal parameterization for every data point in sample
-    spline, u = splprep(sample, s=20, k=2, per=True)
+    spline, u = splprep(sample, s=0, k=2, per=True)
 
     # Samples very finely along the spline interpolation for accurate distance parameterization
     u_fine = np.linspace(u.min(), u.max(), 1_000_000)
@@ -62,13 +62,13 @@ def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
     # Generates u_spaced by estimating the u parameterization based on the relationship between
     # Euclidian distance (dist) and scipy parameterization u.
     u_spaced = np.interp(target_dist, dist, u_fine)
-    u_spaced = np.append(u_spaced, u[-1])  # make sure end waypoint is preserved
+    # u_spaced = np.append(u_spaced, u[-1])  # make sure end waypoint is preserved
 
     # Evaluates spline
     sampled = splev(u_spaced, spline)
 
     # Returns Euclidean distance to each point and spline samples
-    return u_spaced, sampled, spline
+    return target_dist, sampled, spline
 
 
 
@@ -155,7 +155,7 @@ s_track = [
 ]
 
 print(len(interpolated_track[0][:, o_nearest]), len(dists[2]))
-print(s_track[0].shape)
+print(s_track[0].shape, dists[2].shape)
 spline_l, _ = splprep(s_track[0], u=dists[2])
 spline_r, _ = splprep(s_track[1], u=dists[2])
 spline_c, _ = splprep(s_track[2], u=dists[2])
@@ -167,13 +167,12 @@ plots = []
 # for t in track:
 #     ax.scatter(*t)
 
-# for t in s_track:
-#     plots.append()
-#     print("test")
+for t in s_track:
+    plots.append(go.Scatter3d(x=t[0], y=t[1], z=t[2], name="original"))
 
 for s in (spline_l, spline_r, spline_c):
     x, y, z = splev(dists[2], s)
-    plots.append(go.Scatter3d(x=x, y=y, z=z))
+    plots.append(go.Scatter3d(x=x, y=y, z=z, name="param splines"))
 
 
 fig = go.Figure(data=plots)
