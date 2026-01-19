@@ -152,6 +152,8 @@ s_track = [
     interpolated_track[2],
 ]
 
+print(len(interpolated_track[0][:, o_nearest]), len(dists[2]))
+print(s_track[0].shape)
 spline_l, _ = splprep(s_track[0], u=dists[2])
 spline_r, _ = splprep(s_track[1], u=dists[2])
 spline_C, _ = splprep(s_track[2], u=dists[2])
@@ -164,9 +166,14 @@ plots = []
 # for t in track:
 #     ax.scatter(*t)
 
-for t in s_track:
-    plots.append(go.Scatter3d(x=t[0], y=t[1], z=t[2]))
-    print("test")
+# for t in s_track:
+#     plots.append(go.Scatter3d(x=t[0], y=t[1], z=t[2]))
+#     print("test")
+
+plots.append(splev(dists[2], spline_l))
+plots.append(splev(dists[2], spline_r))
+plots.append(splev(dists[2], spline_c))
+
 
 fig = go.Figure(data=plots)
 fig.update_layout(scene=dict(aspectmode="data"))
