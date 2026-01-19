@@ -68,7 +68,7 @@ def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
     sampled = splev(u_spaced, spline)
 
     # Returns Euclidean distance to each point and spline samples
-    return dist, sampled
+    return u_spaced, sampled, spline
 
 
 
@@ -129,13 +129,15 @@ track[2] = np.asarray(track[2])
 
 interpolated_track = []
 dists = []
+splines = []
 
 for i, t in enumerate(track):
-    dist, sampled = interpolate(t, 0.1 if i < 2 else RESOLUTION)  # type: ignore
+    dist, sampled, spline = interpolate(t, 0.1 if i < 2 else RESOLUTION)  # type: ignore
 
     interpolated_track.append(sampled)
     interpolated_track[i] = np.asarray(interpolated_track[i])
     dists.append(dist)
+    splines.append(spline)
 
 
 out_nn = KDTree(np.transpose(interpolated_track[0][:2]))
@@ -156,8 +158,7 @@ print(len(interpolated_track[0][:, o_nearest]), len(dists[2]))
 print(s_track[0].shape)
 spline_l, _ = splprep(s_track[0], u=dists[2])
 spline_r, _ = splprep(s_track[1], u=dists[2])
-spline_C, _ = splprep(s_track[2], u=dists[2])
-
+spline_c, _ = splprep(s_track[2], u=dists[2])
 
 plots = []
 # for t in interpolated_track:
@@ -167,12 +168,12 @@ plots = []
 #     ax.scatter(*t)
 
 # for t in s_track:
-#     plots.append(go.Scatter3d(x=t[0], y=t[1], z=t[2]))
+#     plots.append()
 #     print("test")
 
-plots.append(splev(dists[2], spline_l))
-plots.append(splev(dists[2], spline_r))
-plots.append(splev(dists[2], spline_c))
+for s in (spline_l, spline_r, spline_c):
+    x, y, z = splev(dists[2], s)
+    plots.append(go.Scatter3d(x=x, y=y, z=z))
 
 
 fig = go.Figure(data=plots)
