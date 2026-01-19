@@ -5,3 +5,4 @@ casadi
 PyQT5
 pyproj
 scipy
+plotly
