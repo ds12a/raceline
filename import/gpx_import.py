@@ -20,7 +20,8 @@ RESOLUTION = 10.0  # meters
 
 
 def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
-    """Fits polynomial splines to the given sample and returns a new array with
+    """
+    Fits polynomial splines to the given sample and returns a new array with
     evenly spaced points sampled from the splines. We approximate the total distance
     of the calculated splines and map the desired distances of each point to the
     default parameterization produce by scipy.
@@ -41,7 +42,7 @@ def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
     spline, u = splprep(sample, s=20, k=2, per=True)
 
     # Samples very finely along the spline interpolation for accurate distance parameterization
-    u_fine = np.linspace(u.min(), u.max(), 100000)
+    u_fine = np.linspace(u.min(), u.max(), 1_000_000)
     fine_sample = splev(u_fine, spline)
 
     # Calculates Euclidian distance at each point in the fine sample
@@ -68,6 +69,7 @@ def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
 
     # Returns Euclidean distance to each point and spline samples
     return dist, sampled
+
 
 
 # Reads gpx file
@@ -126,12 +128,14 @@ for i, c in enumerate(c_nearest):  # type: ignore
 track[2] = np.asarray(track[2])
 
 interpolated_track = []
+dists = []
 
 for i, t in enumerate(track):
     dist, sampled = interpolate(t, 0.1 if i < 2 else RESOLUTION)  # type: ignore
 
     interpolated_track.append(sampled)
     interpolated_track[i] = np.asarray(interpolated_track[i])
+    dists.append(dist)
 
 
 out_nn = KDTree(np.transpose(interpolated_track[0][:2]))
@@ -147,6 +151,10 @@ s_track = [
     interpolated_track[1][:, i_nearest],
     interpolated_track[2],
 ]
+
+spline_l, _ = splprep(s_track[0], u=dists[2])
+spline_r, _ = splprep(s_track[1], u=dists[2])
+spline_C, _ = splprep(s_track[2], u=dists[2])
 
 
 plots = []
