@@ -1,4 +1,5 @@
 A repository containing tools to generate a smooth and periodic racetrack from boundary points measured with noisy GPS or other methods.
+
 Formulates an Optimal Control Problem that is solved with CasADi.
 
 
