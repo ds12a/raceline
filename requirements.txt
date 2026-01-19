@@ -4,3 +4,4 @@ gpxpy
 casadi
 PyQT5
 pyproj
+scipy

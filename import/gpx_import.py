@@ -8,59 +8,69 @@ import gpxpy.gpx
 from pyproj import Transformer
 from scipy.interpolate import splev, splprep
 from scipy.spatial import KDTree
-from casadi import *  # type: ignore
+from casadi import *
+import plotly.express as px
+import plotly.graph_objects as go
+
 
 matplotlib.use("Qt5Agg")
 
 FILE = "Track.gpx"
-RESOLUTION = 2.0  # meters
-
-w_c = 1e-3
-w_l = 1e-3
-w_r = 1e-3
-w_theta = 3e3
-w_mu = 1e9
-w_phi = 1e9
-w_nl = 1e-2
-w_nr = 1e-2
+RESOLUTION = 10.0  # meters
 
 
-def interpolate(trajectory: np.ndarray, spacing: float = 0.1) -> np.ndarray:
-    """
-    Fits cubic splines to the given trajectory and returns a new trajectory with
+def interpolate(sample: np.ndarray, spacing: float = 0.1) -> np.ndarray:
+    """Fits polynomial splines to the given sample and returns a new array with
     evenly spaced points sampled from the splines. We approximate the total distance
     of the calculated splines and map the desired distances of each point to the
     default parameterization produce by scipy.
+
+    Args:
+        sample (np.ndarray):    A 2-dimensional array in the format [[point],[point], ... ].
+                                For convenience, the method parameterizes based on arc length
+                                of the first three values in each point assumed (x,y,z)
+        spacing (float, optional):  The distance spacing between each of the points in the array
+                                    that is returned. Defaults to 0.1.
+
+    Returns:
+        np.ndarray: A set of evenly-spaced points along the interpolated spline
     """
-    if len(trajectory) < 2:
-        return trajectory
 
-    spline, u = splprep(trajectory, s=20, k=2, per=True)
+    # Creates the initial spline
+    # u is an NDArray that contains scipy's internal parameterization for every data point in sample
+    spline, u = splprep(sample, s=20, k=2, per=True)
 
-    # make really smooth for accurate distance
-    u_fine = np.linspace(u.min(), u.max(), 100000)  # TODO find good number
-    x_fine, y_fine, z_fine = splev(u_fine, spline)
+    # Samples very finely along the spline interpolation for accurate distance parameterization
+    u_fine = np.linspace(u.min(), u.max(), 100000)
+    fine_sample = splev(u_fine, spline)
 
-    # calculate distance from start for each point
+    # Calculates Euclidian distance at each point in the fine sample
     dist = np.cumsum(
-        np.sqrt(np.diff(x_fine) ** 2 + np.diff(y_fine) ** 2 + np.diff(z_fine) ** 2)
+        np.sqrt(
+            np.diff(fine_sample[0]) ** 2
+            + np.diff(fine_sample[1]) ** 2
+            + np.diff(fine_sample[2]) ** 2
+        )
     )
-    dist = np.insert(dist, 0, 0)
+    dist = np.insert(dist, 0, 0)  # 0 inserted for first point
 
+    # Calculates number of samples and generates distances to samplee at with even spacing
     samples = int(dist[-1] / spacing)
     target_dist = np.linspace(0, samples * spacing, samples + 1)
 
-    u_spaced = np.interp(target_dist, dist, u_fine)  # map distance to u parameter
-    # u_spaced = np.append(u_spaced, u[-1])  # make sure end waypoint is preserved
+    # Generates u_spaced by estimating the u parameterization based on the relationship between
+    # Euclidian distance (dist) and scipy parameterization u.
+    u_spaced = np.interp(target_dist, dist, u_fine)
+    u_spaced = np.append(u_spaced, u[-1])  # make sure end waypoint is preserved
 
+    # Evaluates spline
     sampled = splev(u_spaced, spline)
 
-    return (
-        dist,
-        sampled,
-    )  # np.column_stack([*sampled, np.zeros(sampled[0].shape[0])]) # type: ignore
+    # Returns Euclidean distance to each point and spline samples
+    return dist, sampled
 
 
+# Reads gpx file
 with open(FILE) as file:
     gpx = gpxpy.parse(file)
 
@@ -104,7 +114,7 @@ z_min = min(np.min(track[0][2]), np.min(track[1][2]))
 track[0][2] -= z_min
 track[1][2] -= z_min
 
-
+# Query for nearest point on the right for each left point to generate the centerline
 center_nn = KDTree(np.transpose(track[1]))
 _, c_nearest = center_nn.query(np.transpose(track[0]))
 for i, c in enumerate(c_nearest):  # type: ignore
@@ -139,116 +149,7 @@ s_track = [
 ]
 
 
-opti = ca.Opti()
-l = len(s_track[0][0])
-
-# Defining state variables
-x = opti.variable(l, 1)  # NOTE: dx/ds = cos(theta)cos(mu)
-y = opti.variable(l, 1)  # NOTE: dy/ds = sin(theta)cos(mu)
-z = opti.variable(l, 1)  # NOTE: dz/ds = -sin(mu)
-theta = opti.variable(l, 1)
-mu = opti.variable(l, 1)
-phi = opti.variable(l, 1)
-d_theta = opti.variable(l, 1)
-d_mu = opti.variable(l, 1)
-d_phi = opti.variable(l, 1)
-n_l = opti.variable(l, 1)
-n_r = opti.variable(l, 1)
-
-chi = ca.horzcat(x, y, z, theta, mu, phi, d_theta, d_mu, d_phi, n_r, n_l)
-
-# Defining control variables
-d2_theta = opti.variable(l, 1)
-d2_mu = opti.variable(l, 1)
-d2_phi = opti.variable(l, 1)
-d_n_l = opti.variable(l, 1)
-d_n_r = opti.variable(l, 1)
-
-nu = ca.horzcat(d2_theta, d2_mu, d2_phi, d_n_l, d_n_r)
-
-
-
-# Defining loss function variables
-# NOTE: While in the paper, it passes in state and control vectors explicitly, we choose to
-# individually pass functions relevant arguments.
-
-
-# 1D Placeholder variables for tracking error
-_x = opti.variable(1, 1)
-_y = opti.variable(1, 1)
-_z = opti.variable(1, 1)
-_theta = opti.variable(1, 1)
-_mu = opti.variable(1, 1)
-_phi = opti.variable(1, 1)
-_n_l = opti.variable(1, 1)
-_n_r = opti.variable(1, 1)
-_d_theta = opti.variable(1, 1)
-_d_mu = opti.variable(1, 1)
-_d_phi = opti.variable(1, 1)
-_d2_theta = opti.variable(1, 1)
-_d2_mu = opti.variable(1, 1)
-_d2_phi = opti.variable(1, 1)
-_d_n_l = opti.variable(1, 1)
-_d_n_r = opti.variable(1, 1)
-
-
-e = ca.Function("e", [_x, _y, _z, _theta, _mu, _phi, _n_l, _n_r])
-
-
-X = ca.horzcat(x, y, z)
-N = ca.horzcat(
-    cos(theta) * sin(mu) * sin(phi) - sin(theta) * cos(phi),
-    sin(theta) * sin(mu) * sin(theta) + cos(theta) * cos(phi),
-    cos(mu) * sin(phi),
-)
-B_l = X + N * ca.horzcat(n_l, n_l, n_l)
-B_r = X + N * ca.horzcat(n_r, n_r, n_r)
-
-r_c = w_theta * d2_theta**2 + w_mu * d2_mu**2 + w_phi * d2_phi**2
-r_w = ca.Function("r_w", [opti.variable()], [w_nl * d_n_l**2 + w_nr * d_n_r**2])
-
-# Function for the derivative of the state vector
-f = ca.Function(
-    "f",
-    [theta_ph, mu_ph, d_theta_ph, d_mu_ph, d_phi_ph, d2_theta_ph, d2_mu_ph, d2_phi_ph, d_n_l_ph, d_n_r_ph],
-    [
-        ca.horzcat(
-            cos(theta_ph) * cos(mu_ph),
-            sin(theta_ph) * cos(mu_ph),
-            -sin(mu),
-            d_theta,
-            d_mu,
-            d_phi,
-            d2_theta,
-            d2_mu,
-            d2_phi,
-            d_n_l,
-            d_n_r,
-        )
-    ],
-)
-
-for i in range(l):
-    opti.subject_to(-ca.pi / 2 < mu[i] < ca.pi)
-    # Updating for the timestep
-
-    opti.subject_to(chi[(i + 1) % l] == f * RESOLUTION + chi[i])
-
-    e[i]
-
-    # Variables and formulae for loss function calculation
-
-
-l = e + n_l + n_r
-
-
-# Tracking error e(s, chi, nu)
-
-
-fig = plt.figure()
-ax = fig.add_subplot(projection="3d")
-
-
+plots = []
 # for t in interpolated_track:
 #     ax.plot(*t)
 
@@ -256,8 +157,10 @@ ax = fig.add_subplot(projection="3d")
 #     ax.scatter(*t)
 
 for t in s_track:
-    ax.scatter(*t)
+    plots.append(go.Scatter3d(x=t[0], y=t[1], z=t[2]))
+    print("test")
 
-ax.set_aspect("equal", adjustable="box")
+fig = go.Figure(data=plots)
+fig.update_layout(scene=dict(aspectmode="data"))
 
-plt.show()
+fig.show()
