@@ -183,7 +183,6 @@ def fit_iteration(
 
     J = 0
 
-
     # for initial guess
     theta_accum = []
 
@@ -345,12 +344,12 @@ def fit_iteration(
         "ipopt.print_level": 5,
         "print_time": 0,
         "ipopt.sb": "no",
-        "ipopt.max_iter": 1000,
+        # "ipopt.max_iter": 1000,
         "detect_simple_bounds": True,
-        'ipopt.mu_strategy': 'adaptive',
-        'ipopt.nlp_scaling_method': 'gradient-based',
-        'ipopt.bound_relax_factor': 1e-8, 
-        'ipopt.honor_original_bounds': 'yes',
+        "ipopt.mu_strategy": "adaptive",
+        "ipopt.nlp_scaling_method": "gradient-based",
+        "ipopt.bound_relax_factor": 1e-8,
+        "ipopt.honor_original_bounds": "yes",
     }
 
     opti.minimize(J)
@@ -405,6 +404,8 @@ def plot(plots, X, Q):
 if __name__ == "__main__":
     from gpx_import import read_gpx_splines
     import plotly.graph_objects as go
+    import plotly.express as px
+
 
     s_track = [0, 0, 0]
     track, (
@@ -418,7 +419,7 @@ if __name__ == "__main__":
     ) = read_gpx_splines("Monza_better.gpx")
 
     X, Q = fit_iteration(
-        np.linspace(0, max_dist, 40), np.array([5] * 39), spline_c, spline_l, spline_r
+        np.linspace(0, max_dist, 70), np.array([15] * 69), spline_c, spline_l, spline_r
     )
 
     # print(Q[0])
@@ -437,14 +438,24 @@ if __name__ == "__main__":
     )
     plots.append(
         go.Scatter3d(
-            x=track[2][0], y=track[2][1], z=track[2][2], name="original center"
+            x=Q[:, 0], y=Q[:, 1], z=Q[:, 2], name="theta, mu, phi"
         )
     )
 
     fig = go.Figure(data=plots)
-    fig.update_layout(scene=dict(aspectmode="data"))
-
     fig.show()
+
+    fig.update_layout(scene=dict(aspectmode="data"))
+    fig.show()
+
+    q_plot = []
+    q_plot.append(go.Scatter3d(
+            x=Q[:, 0], y=Q[:, 1], z=Q[:, 2], name="theta, mu, phi"
+        ))
+    q_fig = go.Figure(data=q_plot)
+    q_fig.show()
+
+    px.scatter(x=Q[:, 4], y=Q[:, 4]).show()
 
     # position = []
 
