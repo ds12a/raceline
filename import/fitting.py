@@ -1,4 +1,3 @@
-# import casadi as ca
 from casadi import *
 import numpy as np
 from scipy.interpolate import splev, BSpline
@@ -37,7 +36,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
         spline_c: BSpline,
         spline_l: BSpline,
         spline_r: BSpline,
-        w_c: float = 1e1,
+        w_c: float = 1e-3,
         w_l: float = 1e-3,
         w_r: float = 1e-3,
     ) -> MX:
@@ -105,7 +104,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
         """
         return w_theta * u[0] ** 2 + w_mu * u[1] ** 2 + w_phi * u[2] ** 2
 
-    def r_w(u, w_n_l=1e2, w_n_r=1e2):
+    def r_w(u, w_n_l=1e5, w_n_r=1e5):
         """
         Computes the error term that penalizes track boundary noise
         r_w = w_n_l * dd_n_l^2 + w_n_r * dd_n_r^2
@@ -127,7 +126,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
 
 def generate_D(tau) -> np.ndarray:
     """
-    Generates differentiation matrix
+    Generates differentiation matrix using Barycentric weights
 
     Args:
         tau (np.ndarray): 1D numpy array containing LG points and -1 and 1
@@ -162,7 +161,7 @@ def fit_iteration(
     spline_r: BSpline,
 ):
     """
-    Runs a single iteration of hp-adpative pseudospectral collocation
+    Runs a single iteration of pseudospectral collocation.
 
     Args:
         t (np.ndarray): 1D numpy array containing the mesh points
@@ -174,36 +173,50 @@ def fit_iteration(
     """
     opti = Opti()
 
-    K = len(N)
-    Q = []
-    dQ = []
-    ddQ = []
-    X = []
-    dX = []
+    K = len(N)      # Number of time intervals
 
-    J = 0
+    # State and configuration + derivative matrices. For any matrix M that represents a function
+    # m(tau) on a segment k, M_ij = m_j(tau_i)
 
-    # for initial guess
-    theta_accum = []
+    # Q, dQ, ddQ are (N_k + 2) x (n_q).
+    Q = []          # Array containing Q matrices. q_j = [theta, mu, phi, n_l, n_r].
+    dQ = []         # Array containing dQ (1st der) matrices.
+    ddQ = []        # Array containing ddQ (2nd der) matrices.
+
+    # X, dX are (N_k + 2) x (n_x).
+    X = []          # Array containing X matrices. x_j = [x,y,z].
+    dX = []         # Array containing dX (1st der matrices).
+
+    J = 0           # Cost accumulator
+
+    # Stores the theta values for the initial guess
+    theta_arr = []
 
     # Constraints for each segment k
-
     for k in range(K):
-        half_time_diff = (t[k + 1] - t[k]) / 2
-        mid_time = (t[k + 1] + t[k]) / 2
+        
+        # Useful values for conversion between t and tau
+        norm_factor = (t[k + 1] - t[k]) / 2
+        t_tau_0 = (t[k + 1] + t[k]) / 2             # Global time t at tau = 0
 
+        # Legendre Gauss collocation points tau with appended -1 and 1
+        # w is the quadrature weights
         tau, w = np.polynomial.legendre.leggauss(N[k])
         tau = np.asarray([-1] + list(tau) + [1])
-        # Global time at collocation points
-        t_tau = half_time_diff * tau + mid_time
+        
+        # Global time (t) at collocation points
+        t_tau = norm_factor * tau + t_tau_0
 
+        # Differentiation matrix
         D = generate_D(tau)
 
+        # Generates X and Q matrices + derivatives for this segment
         if k == 0:
             Q.append(opti.variable(N[k] + 2, n_q))
             X.append(opti.variable(N[k] + 2, n_x))
         else:
             # Explicitly couples last of previous segment with first of current segment
+            # by setting them as the same variable
             Q.append(vertcat(Q[k - 1][-1, :], opti.variable(N[k] + 1, n_q)))
             X.append(vertcat(X[k - 1][-1, :], opti.variable(N[k] + 1, n_x)))
 
@@ -213,12 +226,10 @@ def fit_iteration(
 
         # Continuity constraints
         if k != 0:
-            #     opti.subject_to(X[k - 1][-1, :] == X[k][0, :])
-            #     opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
             opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
-            # opti.subject_to(ddQ[k - 1][-1, :] == ddQ[k][0, :])
+            opti.subject_to(ddQ[k - 1][-1, :] == ddQ[k][0, :])
 
-        # Collocation constraints
+        # Collocation constraints (enforces dynamics on X)
         theta = Q[k][:-1, 0]
         mu = Q[k][:-1, 1]
 
@@ -226,19 +237,6 @@ def fit_iteration(
         opti.subject_to(dX[k][:-1, 1] == sin(theta) * cos(mu))
         opti.subject_to(dX[k][:-1, 2] == -sin(mu))
         opti.subject_to(opti.bounded(-pi / 2 + 1e-3, mu, pi / 2 - 1e-3))
-
-        # for i in range(1, N[k] + 1):
-        #     theta = Q[k][i, 0]
-        #     mu = Q[k][i, 1]
-        #     phi = Q[k][i, 2]
-        #     n_l = Q[k][i, 3]
-        #     n_r = Q[k][i, 4]
-
-        #     opti.subject_to(dX[k][i, 0] == cos(theta) * cos(mu))
-        #     opti.subject_to(dX[k][i, 1] == sin(theta) * cos(mu))
-        #     opti.subject_to(dX[k][i, 2] == -sin(mu))
-
-        #     opti.subject_to([(-pi / 2) < mu, mu < (pi / 2)])
 
         # Quadrature enforcement
         # defect = X[k][0, :]
@@ -255,7 +253,7 @@ def fit_iteration(
                 spline_r,
             )
 
-            J += half_time_diff * w[j] * lagrange_term
+            J += norm_factor * w[j] * lagrange_term
 
             # dy_term = horzcat(
             #     cos(theta[j, 0]) * cos(mu[j, 0]),
@@ -267,34 +265,32 @@ def fit_iteration(
         # Note: by continuity constraints it is guaranteed X[k + 1][0, :] == X[k][-1, :]
         # opti.subject_to(defect == X[k][-1, :])
 
-        # Initial guesses
+        # ========================== Generates initial guesses for variables  ==========================
+
+        # Guesses X values based on spline position
         opti.set_initial(X[k], np.asarray(splev(t_tau, spline_c)).T)
 
+        # Creates tangent and normal vectors to find Euclidean angles theta, mu, phi
+        # tangent estimate = (spline_c)' / ||t||
         tangent = np.asarray(splev(t_tau, spline_c, der=1)).T
         tangent = tangent / np.linalg.norm(tangent, axis=1)[:, np.newaxis]
+
+        # normal estimate = (spline_l - spline_c) / ||n||
         normal = (
             np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))
         ).T
         normal = normal / np.linalg.norm(normal, axis=1)[:, np.newaxis]
 
+        # Calculates Euclidean angles
         mu_guess = np.asin(-tangent[:, 2])
         theta_guess = np.arctan2(tangent[:, 1], tangent[:, 0])
         phi_guess = np.asin(normal[:, 2] / np.cos(mu_guess))
+        theta_arr.append(theta_guess)
 
-        # theta needs accumulation
-        # theta_guess = np.cumsum(theta_guess)
-
-        # print(f"k={k}")
-        # print(tangent[0], normal[0], mu_guess[0], theta_guess[0], phi_guess[0])
-        # if k == K - 1:
-        #     print("k=last")
-        #     print(tangent[-1], normal[-1], mu_guess[-1], theta_guess[-1], phi_guess[-1])
-
-        theta_accum.append(theta_guess)
-        # opti.set_initial(Q[k][:, 0], theta_guess)
         opti.set_initial(Q[k][:, 1], mu_guess)
         opti.set_initial(Q[k][:, 2], phi_guess)
 
+        # Estimates left-right boundary lengths
         nl_guess = np.linalg.norm(
             (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T,
             axis=1,
@@ -308,8 +304,9 @@ def fit_iteration(
         opti.set_initial(Q[k][:, 4], nr_guess)
 
     # Unwrapping / removing theta jump discontinuity
-    last = theta_accum[0][0]
-    for k, seg in enumerate(theta_accum):
+    # TODO there are many more efficient ways to do this
+    last = theta_arr[0][0]
+    for k, seg in enumerate(theta_arr):
         for i, theta in enumerate(seg):
             diff = theta - last
             while diff > np.pi or diff < -np.pi:
@@ -321,7 +318,7 @@ def fit_iteration(
             last = seg[i]
         opti.set_initial(Q[k][:, 0], seg)
         print(seg[0])
-    print(theta_accum[-1][-1])
+    print(theta_arr[-1][-1])
 
     # Initial conditions
     x0 = splev(0, spline_c)
@@ -336,10 +333,9 @@ def fit_iteration(
     opti.subject_to(Q[-1][-1, 0] == Q[0][0, 0] - 2 * pi)
     opti.subject_to(Q[-1][-1, 1:] == Q[0][0, 1:])
     opti.subject_to(dQ[-1][-1, :] == dQ[0][0, :])
-    # opti.subject_to(ddQ[-1][-1, :] == ddQ[0][0, :])
+    opti.subject_to(ddQ[-1][-1, :] == ddQ[0][0, :])
 
     # Optimize!
-
     solver_options = {
         "ipopt.print_level": 5,
         "print_time": 0,
@@ -362,18 +358,22 @@ def fit_iteration(
     solution_x = []
     solution_q = []
 
+    X_sol = []
+    Q_sol = []
+
     for k, segment_q in enumerate(Q):
         segment_q = sol.value(segment_q)
+        Q_sol.append(segment_q)
         for i in range(N[k] + 2):
             solution_q.append(segment_q[i, :])
 
     for k, segment_x in enumerate(X):
         segment_x = sol.value(segment_x)
-
+        X_sol.append(segment_x)
         for i in range(N[k] + 2):
             solution_x.append(segment_x[i, :])
 
-    return np.asarray(solution_x), np.asarray(solution_q)
+    return np.asarray(solution_x), np.asarray(solution_q), X_sol, Q_sol
 
 
 def plot(plots, X, Q):
@@ -404,6 +404,7 @@ def plot(plots, X, Q):
 if __name__ == "__main__":
     from gpx_import import read_gpx_splines
     import plotly.graph_objects as go
+    from track import Track
     import plotly.express as px
 
 
@@ -418,23 +419,22 @@ if __name__ == "__main__":
         s_track[2],
     ) = read_gpx_splines("Monza_better.gpx")
 
-    X, Q = fit_iteration(
-        np.linspace(0, max_dist, 70), np.array([15] * 69), spline_c, spline_l, spline_r
+    X, Q, X_mat, Q_mat = fit_iteration(
+        np.linspace(0, max_dist, 75), np.array([25] * 74), spline_c, spline_l, spline_r
     )
 
     # print(Q[0])
-
     plots = []
 
-    plot(plots, X, Q)
+    # plot(plots, X, Q)
 
     # plots.append(go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], name="center"))
 
     plots.append(
-        go.Scatter3d(x=track[0][0], y=track[0][1], z=track[0][2], name="original left")
+        go.Scatter3d(x=track[0][0], y=track[0][1], z=track[0][2], name="original left", mode="markers")
     )
     plots.append(
-        go.Scatter3d(x=track[1][0], y=track[1][1], z=track[1][2], name="original right")
+        go.Scatter3d(x=track[1][0], y=track[1][1], z=track[1][2], name="original right", mode="markers")
     )
     plots.append(
         go.Scatter3d(
@@ -442,9 +442,17 @@ if __name__ == "__main__":
         )
     )
 
-    fig = go.Figure(data=plots)
-    fig.show()
+    fig = go.Figure()
 
+    foo = Track(Q_mat, X_mat, np.linspace(0, max_dist, 75))
+    fine_plot = foo.plot_uniform(2)
+    # print(fine_plot)
+    for i in fine_plot:
+        fig.add_trace(i)
+    for i in plots:
+        fig.add_trace(i)
+
+    fig.show()
     fig.update_layout(scene=dict(aspectmode="data"))
     fig.show()
 
