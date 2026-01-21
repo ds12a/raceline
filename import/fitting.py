@@ -173,37 +173,37 @@ def fit_iteration(
     """
     opti = Opti()
 
-    K = len(N)      # Number of time intervals
+    K = len(N)  # Number of time intervals
 
     # State and configuration + derivative matrices. For any matrix M that represents a function
     # m(tau) on a segment k, M_ij = m_j(tau_i)
 
     # Q, dQ, ddQ are (N_k + 2) x (n_q).
-    Q = []          # Array containing Q matrices. q_j = [theta, mu, phi, n_l, n_r].
-    dQ = []         # Array containing dQ (1st der) matrices.
-    ddQ = []        # Array containing ddQ (2nd der) matrices.
+    Q = []  # Array containing Q matrices. q_j = [theta, mu, phi, n_l, n_r].
+    dQ = []  # Array containing dQ (1st der) matrices.
+    ddQ = []  # Array containing ddQ (2nd der) matrices.
 
     # X, dX are (N_k + 2) x (n_x).
-    X = []          # Array containing X matrices. x_j = [x,y,z].
-    dX = []         # Array containing dX (1st der matrices).
+    X = []  # Array containing X matrices. x_j = [x,y,z].
+    dX = []  # Array containing dX (1st der matrices).
 
-    J = 0           # Cost accumulator
+    J = 0  # Cost accumulator
 
     # Stores the theta values for the initial guess
     theta_arr = []
 
     # Constraints for each segment k
     for k in range(K):
-        
+
         # Useful values for conversion between t and tau
         norm_factor = (t[k + 1] - t[k]) / 2
-        t_tau_0 = (t[k + 1] + t[k]) / 2             # Global time t at tau = 0
+        t_tau_0 = (t[k + 1] + t[k]) / 2  # Global time t at tau = 0
 
         # Legendre Gauss collocation points tau with appended -1 and 1
         # w is the quadrature weights
         tau, w = np.polynomial.legendre.leggauss(N[k])
         tau = np.asarray([-1] + list(tau) + [1])
-        
+
         # Global time (t) at collocation points
         t_tau = norm_factor * tau + t_tau_0
 
@@ -340,7 +340,7 @@ def fit_iteration(
         "ipopt.print_level": 5,
         "print_time": 0,
         "ipopt.sb": "no",
-        # "ipopt.max_iter": 1000,
+        "ipopt.max_iter": 1_000,
         "detect_simple_bounds": True,
         "ipopt.mu_strategy": "adaptive",
         "ipopt.nlp_scaling_method": "gradient-based",
@@ -407,7 +407,6 @@ if __name__ == "__main__":
     from track import Track
     import plotly.express as px
 
-
     s_track = [0, 0, 0]
     track, (
         max_dist,
@@ -428,17 +427,26 @@ if __name__ == "__main__":
 
     # plot(plots, X, Q)
 
-    # plots.append(go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], name="center"))
+    plots.append(
+        go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], name="center", mode="lines")
+    )
 
     plots.append(
-        go.Scatter3d(x=track[0][0], y=track[0][1], z=track[0][2], name="original left", mode="markers")
-    )
-    plots.append(
-        go.Scatter3d(x=track[1][0], y=track[1][1], z=track[1][2], name="original right", mode="markers")
+        go.Scatter3d(
+            x=track[0][0],
+            y=track[0][1],
+            z=track[0][2],
+            name="original left",
+            mode="lines",
+        )
     )
     plots.append(
         go.Scatter3d(
-            x=Q[:, 0], y=Q[:, 1], z=Q[:, 2], name="theta, mu, phi"
+            x=track[1][0],
+            y=track[1][1],
+            z=track[1][2],
+            name="original right",
+            mode="lines",
         )
     )
 
@@ -457,9 +465,11 @@ if __name__ == "__main__":
     fig.show()
 
     q_plot = []
-    q_plot.append(go.Scatter3d(
-            x=Q[:, 0], y=Q[:, 1], z=Q[:, 2], name="theta, mu, phi"
-        ))
+    q_plot.append(
+        go.Scatter3d(
+            x=Q[:, 0], y=Q[:, 1], z=Q[:, 2], name="theta, mu, phi", mode="lines"
+        )
+    )
     q_fig = go.Figure(data=q_plot)
     q_fig.show()
 
