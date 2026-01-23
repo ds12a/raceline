@@ -2,7 +2,7 @@ from casadi import *
 import numpy as np
 from scipy.interpolate import splev, BSpline
 from track import Track
-
+import math
 
 # Number of elements in configuration and euclidean state
 n_q = 5
@@ -20,7 +20,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
     Args:
         t (float): Arc length parameter
         x (CasADi Expression | np.ndarray): Vector containing [x, y, z]
-        q (CasADi Expression | np.ndarray): Vector containing [θ, μ, Φ]
+        q (CasADi Expression | np.ndarray): Vector containing [θ, μ, Φ, n_l, n_r]
         u (CasADi Expression | np.ndarray): The control vector of second derivatives. u = ddq
         spline_c (BSpline): Scipy BSpline for center line
         spline_l (BSpline): Scipy BSpline for left boundary
@@ -196,7 +196,6 @@ def fit_iteration(
 
     # Constraints for each segment k
     for k in range(K):
-
         # Useful values for conversion between t and tau
         norm_factor = (t[k + 1] - t[k]) / 2
         t_tau_0 = (t[k + 1] + t[k]) / 2  # Global time t at tau = 0
@@ -333,7 +332,7 @@ def fit_iteration(
         "ipopt.print_level": 5,
         "print_time": 0,
         "ipopt.sb": "no",
-        # "ipopt.max_iter": 1_000,
+        "ipopt.max_iter": 1000,
         "detect_simple_bounds": True,
         "ipopt.mu_strategy": "adaptive",
         "ipopt.nlp_scaling_method": "gradient-based",
@@ -372,24 +371,46 @@ def fit_iteration(
     return np.asarray(solution_x), np.asarray(solution_q), X_sol, Q_sol
 
 
-def mesh_refinement(
-    spline_c: BSpline, spline_l: BSpline, spline_r: BSpline, max_dist: float
-):
+def fit_track(
+    spline_c: BSpline,
+    spline_l: BSpline,
+    spline_r: BSpline,
+    max_dist: float,
+    refinement_steps: int = 2,
+) -> Track:
+    """
+    Fits a Track object
 
-    INITIAL_COLLOCATION = 25
-    INITIAL_POINTS = 75
+    Args:
+        spline_c (BSpline): Scipy BSpline for center line
+        spline_l (BSpline): Scipy BSpline for left boundary
+        spline_r (BSpline): Scipy BSpline for right boundary
+        max_dist (float): Length of track
+        refinement_steps (int, optional): Number of mesh refinement steps. Defaults to 4.
+
+    Returns:
+        Track: _description_
+    """
+    INITIAL_COLLOCATION = 5
+    INITIAL_POINTS = 50
 
     t = np.linspace(0, max_dist, INITIAL_POINTS)  # Mesh points
     N = np.array(
         [INITIAL_COLLOCATION] * (INITIAL_POINTS - 1)
     )  # Collocation points per interval
 
+    # Initial track
     X, Q, X_mat, Q_mat = fit_iteration(t, N, spline_c, spline_l, spline_r)
-
     track = Track(Q_mat, X_mat, t)
 
-    for i in range(10):
-        t, N = mesh_refinement_iteration(track, t, N, spline_c, spline_l, spline_r)
+    # Refinement
+    for i in range(refinement_steps):
+        print(f"Refinement step {i + 1}/{refinement_steps}")
+        N, t = mesh_refinement_iteration(track, t, N, spline_c, spline_l, spline_r)
+        X, Q, X_mat, Q_mat = fit_iteration(t, N, spline_c, spline_l, spline_r)
+        track = Track(Q_mat, X_mat, t)
+
+    return track
 
 
 def mesh_refinement_iteration(
@@ -400,30 +421,62 @@ def mesh_refinement_iteration(
     spline_l: BSpline,
     spline_r: BSpline,
     resolution=0.5,
-    std_threshold=1,
-    divides=3,
+    variation_thres=0.4,
+    divides=5,
     degree_increase=5,
-    initial_points=5
-):
+    initial_points=5,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Performs a single iteration of mesh refinement
 
+    Args:
+        track (Track): Track object
+        t (np.ndarray): Array of arc length parameters giving mesh points
+        N (np.ndarray): Array containing the number of collocation points per
+                        interval (length = len(t) - 1)
+        spline_c (BSpline): Scipy BSpline for center line
+        spline_l (BSpline): Scipy BSpline for left boundary
+        spline_r (BSpline): Scipy BSpline for right boundary
+        resolution (float, optional): Sampling resolution. Defaults to 0.5.
+        variation_thres (float, optional): Threshold on ratio of stdev to mean. Defaults to 0.4.
+        divides (int, optional): Number of mesh points added when dividing. Defaults to 2.
+        degree_increase (int, optional): Degree increase when adding collocation points. Defaults to 5.
+        initial_points (int, optional): Starting number of collocation points when
+                                        a new interval is formed. Defaults to 3.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Refined N and t
+    """
+    print(N.shape, t.shape)
+
+    # Start t of each interval
     interval_starts = track.t[:-1]
-    new_t, new_N = [], []
+    new_t, new_N = [t.min()], []
+
+    deg = 0
+    div = 0
 
     for i, start_t in enumerate(interval_starts):
-        end_t = interval_starts[i + 1]
+        end_t = track.t[i + 1]
 
-        sample_t = np.linspace(start_t, end_t, (end_t - start_t) // resolution)
+        # Sample t, remove first and last so they cannot be added multiple times
+        assert end_t != start_t
+        sample_t = np.linspace(
+            start_t, end_t, math.ceil((end_t - start_t) / resolution)
+        )[1:]
 
+        # Sample state at each t as well as its derivative
         states = track.state(sample_t)
         der_states = track.der_state(sample_t)
 
+        # Compute costs across interval i at the end of each t
         costs = np.asarray(
             [
                 g(
-                    sample_t[i],
+                    sample_t[j],
                     state[:3],
-                    state[3:6],
-                    der_states[i][3:6],
+                    state[3:],
+                    der_states[j][3:],
                     spline_c,
                     spline_l,
                     spline_r,
@@ -433,26 +486,39 @@ def mesh_refinement_iteration(
         )
 
         stdev = np.std(costs)
+        mean = np.mean(costs)
+        print("variation", stdev / mean)
         total = np.sum(costs)
 
-        if stdev > std_threshold:
+        if stdev / mean > variation_thres:
             # Divide
+            div += 1
             cumulative = 0
+
+
             for j, c in enumerate(costs):
+                cumulative += c
                 if cumulative > total / divides:
                     cumulative = 0
 
                     new_N.append(initial_points)
-                    new_t.append(interval_starts[j + 1])
+                    new_t.append(sample_t[j])
+
+            if abs(end_t - new_t[-1]) > 1e-7:
+                new_N.append(initial_points)
+                new_t.append(end_t)
 
         else:
             # Increase degree
-            new_N.append(new_N + degree_increase)
-            new_t.append(start_t)
+            deg += 1
+            new_N.append(N[i] + degree_increase)
 
+            new_t.append(end_t)
+
+    print(f"Degree increased: {deg}\tDivided: {div}")
+    print(np.asarray(new_N).shape, np.asarray(new_t).shape)
+    assert len(new_N) + 1 == len(new_t)
     return np.asarray(new_N), np.asarray(new_t)
-
-
 
 
 if __name__ == "__main__":
@@ -471,16 +537,16 @@ if __name__ == "__main__":
         s_track[2],
     ) = read_gpx_splines("Monza_better.gpx")
 
-    X, Q, X_mat, Q_mat = fit_iteration(
-        np.linspace(0, max_dist, 75), np.array([25] * 74), spline_c, spline_l, spline_r
-    )
-
     # Visualize original data
     plots = []
 
     plots.append(
         go.Scatter3d(
-            x=X[:, 0], y=X[:, 1], z=X[:, 2], name="original center", mode="lines"
+            x=track[2][0],
+            y=track[2][1],
+            z=track[2][2],
+            name="original center",
+            mode="lines",
         )
     )
 
@@ -505,7 +571,13 @@ if __name__ == "__main__":
 
     fig = go.Figure()
 
-    foo = Track(Q_mat, X_mat, np.linspace(0, max_dist, 75))
+    # X, Q, X_mat, Q_mat = fit_iteration(
+    #     np.linspace(0, max_dist, 75), np.array([25] * 74), spline_c, spline_l, spline_r
+    # )
+
+    foo = fit_track(spline_c, spline_l, spline_r, max_dist)
+
+    # foo = Track(Q_mat, X_mat, np.linspace(0, max_dist, 75))
     foo.save("monza.json")
 
     fine_plot, q_fine = foo.plot_uniform(1)

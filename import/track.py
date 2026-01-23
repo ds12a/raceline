@@ -91,7 +91,7 @@ class Track:
         tau, k = self.t_to_tau(s)
         return np.asarray(
             [
-                self.poly[interval].derivative(der=der)(parameter)
+                self.poly[interval].derivative(parameter, der=der)
                 for parameter, interval in zip(tau, k)
             ]
         )
