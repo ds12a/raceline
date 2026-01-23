@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 
 matplotlib.use("Qt5Agg")
 
-FILE = "Monza_better.gpx"
+FILE = "Zandvoort.gpx"
 RESOLUTION = 15.0  # meters
 
 
