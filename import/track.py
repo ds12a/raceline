@@ -24,7 +24,6 @@ class Track:
         # [x, y, z, theta, mu, phi, n_l, n_r]
         # List of the interpolated polynomial over each interval
         self.poly = []
-
         self.length = t[-1]
 
         for k in range(len(Q)):
@@ -34,11 +33,8 @@ class Track:
             tau = np.asarray([-1] + list(tau) + [1])
 
             self.poly.append(
-                scipy.interpolate.BarycentricInterpolator(
-                    tau, np.column_stack([X[k], Q[k]])
-                )
+                scipy.interpolate.BarycentricInterpolator(tau, np.column_stack([X[k], Q[k]]))
             )
-
 
     def __call__(self, s: np.ndarray) -> np.ndarray:
         """
@@ -52,7 +48,6 @@ class Track:
         """
         state = self.state(s)
         b_l, b_r = self._find_boundaries(state)
-
         return np.column_stack([b_l, b_r, state[:, :3]])
 
     def state(self, s: np.ndarray) -> np.ndarray:
@@ -70,19 +65,17 @@ class Track:
         k = np.searchsorted(self.t[1:], s)
 
         tau, k = self.t_to_tau(s)
-        return np.asarray(
-            [self.poly[interval](parameter) for parameter, interval in zip(tau, k)]
-        )
+        return np.asarray([self.poly[interval](parameter) for parameter, interval in zip(tau, k)])
 
-    def der_state(self, s: np.ndarray, der=1) -> np.ndarray:
+    def der_state(self, s: np.ndarray, n=1) -> np.ndarray:
         """
-        Computes the der derivative of states (X, Q) at given arc length parameters
+        Computes the nth derivative of states (X, Q) at given arc length parameters
 
         Args:
             s (np.ndarray): Array of arc length parameters
 
         Returns:
-            np.ndarray: Array containing the der deriviative of states
+            np.ndarray: Array containing the nth derivative of states
                         [x, y, z, theta, mu, phi, n_l, n_r] for each given arc length parameter
         """
         s %= self.length
@@ -91,7 +84,7 @@ class Track:
         tau, k = self.t_to_tau(s)
         return np.asarray(
             [
-                self.poly[interval].derivative(parameter, der=der)
+                self.poly[interval].derivative(parameter, der=n)
                 for parameter, interval in zip(tau, k)
             ]
         )
@@ -104,7 +97,7 @@ class Track:
         Returns:
             tuple: Tuple of list of GraphObjects for centerline + left/right boundaries
                    and GraphObject for theta/mu/phi
-        """        
+        """
 
         # Make a real array, not some dumb list
         X_matrix = np.concatenate(self.X)
@@ -145,7 +138,7 @@ class Track:
             line=dict(color=np.arange(len(X_matrix)), colorscale="plasma"),
         )
 
-    def plot_uniform(self, approx_spacing: float):
+    def plot_uniform(self, approx_spacing: float = 2):
         """
         Makes Plotly GraphObjects for centerline, left/right boundaries of track, and
         theta, mu, and phi at uniformly sampled points along the track
@@ -156,7 +149,7 @@ class Track:
         Returns:
             tuple: Tuple of list of GraphObjects for centerline + left/right boundaries
                    and GraphObject for theta/mu/phi
-        """        
+        """
 
         # Sample uniformly according to the given spacing
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
@@ -230,9 +223,7 @@ class Track:
 
         return b_l, b_r
 
-    def tau_to_t(
-        self, tau: float | np.ndarray, k: float | np.ndarray
-    ) -> float | np.ndarray:
+    def tau_to_t(self, tau: float | np.ndarray, k: float | np.ndarray) -> float | np.ndarray:
         """
         Converts tau (interval parameter) to arc length
 
@@ -248,9 +239,7 @@ class Track:
 
         return norm_factor * tau + shift
 
-    def t_to_tau(
-        self, t: float | np.ndarray
-    ) -> tuple[float | np.ndarray, int | np.ndarray]:
+    def t_to_tau(self, t: float | np.ndarray) -> tuple[float | np.ndarray, int | np.ndarray]:
         """
         Converts arc length parameter to tau (interval parameter), can be used with either a numeric value or an
         array of numeric values
@@ -275,9 +264,11 @@ class Track:
 
         Args:
             file (str): File name
-        """        
-        data = dict(x=[x.tolist() for x in self.X], q=[q.tolist() for q in self.Q], t=self.t.tolist())
-        with open(file, 'w') as f:
+        """
+        data = dict(
+            x=[x.tolist() for x in self.X], q=[q.tolist() for q in self.Q], t=self.t.tolist()
+        )
+        with open(file, "w") as f:
             json.dump(data, f)
 
     def load(self, file: str):
@@ -286,8 +277,8 @@ class Track:
 
         Args:
             file (str): Json file name
-        """        
-        with open(file, 'r') as f:
+        """
+        with open(file, "r") as f:
             data = json.load(f)
 
         self.X = [np.array(x) for x in data["x"]]
