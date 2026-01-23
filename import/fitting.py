@@ -106,7 +106,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
         """
         return w_theta * u[0] ** 2 + w_mu * u[1] ** 2 + w_phi * u[2] ** 2
 
-    def r_w(u, w_n_l=1e5, w_n_r=1e5):
+    def r_w(u, w_n_l=3e7, w_n_r=3e7):
         """
         Computes the error term that penalizes track boundary noise
         r_w = w_n_l * dd_n_l^2 + w_n_r * dd_n_r^2
@@ -161,6 +161,8 @@ def fit_iteration(
     spline_c: BSpline,
     spline_l: BSpline,
     spline_r: BSpline,
+    track: Track = None,
+    max_iter: int = 1e3
 ):
     """
     Runs a single iteration of pseudospectral collocation.
@@ -173,6 +175,9 @@ def fit_iteration(
     Returns:
         tbd
     """
+
+    print("Running iteration of collocation fitting...")
+
     opti = Opti()
 
     K = len(N)  # Number of time intervals
@@ -191,8 +196,8 @@ def fit_iteration(
 
     J = 0  # Cost accumulator
 
-    # Stores the theta values for the initial guess
-    theta_arr = []
+    # If there is no warm start, this is a utility variable for initial guessing
+    last_theta_guess = None
 
     # Constraints for each segment k
     for k in range(K):
@@ -228,7 +233,6 @@ def fit_iteration(
         # Continuity constraints
         if k != 0:
             opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
-            opti.subject_to(ddQ[k - 1][-1, :] == ddQ[k][0, :])
 
         # Collocation constraints (enforces dynamics on X)
         theta = Q[k][:-1, 0]
@@ -254,121 +258,102 @@ def fit_iteration(
 
             J += norm_factor * w[j] * lagrange_term
 
-        # Note: by continuity constraints it is guaranteed X[k + 1][0, :] == X[k][-1, :]
-        # opti.subject_to(defect == X[k][-1, :])
-
         # ========================== Generates initial guesses for variables  ==========================
 
-        # Guesses X values based on spline position
-        opti.set_initial(X[k], np.asarray(splev(t_tau, spline_c)).T)
+        # No "warm start" is provided with a previous solve
+        if track is None:
+            # Guesses X values based on spline position
+            opti.set_initial(X[k], np.asarray(splev(t_tau, spline_c)).T)
 
-        # Creates tangent and normal vectors to find Euclidean angles theta, mu, phi
-        # tangent estimate = (spline_c)' / ||t||
-        tangent = np.asarray(splev(t_tau, spline_c, der=1)).T
-        tangent = tangent / np.linalg.norm(tangent, axis=1)[:, np.newaxis]
+            # Creates TNB vectors to find Euler angles
+            tangent = np.asarray(splev(t_tau, spline_c, der=1)).T
+            tangent = tangent / np.linalg.norm(tangent, axis=1)[:, np.newaxis]
+            normal = (
+                np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))
+            ).T
+            normal = normal / np.linalg.norm(normal, axis=1)[:, np.newaxis]
+            binormal = np.cross(tangent, normal)
+            normal = np.cross(binormal, tangent)        # Recalculates N to remove skew
 
-        # normal estimate = (spline_l - spline_c) / ||n||
-        normal = (
-            np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))
-        ).T
-        normal = normal / np.linalg.norm(normal, axis=1)[:, np.newaxis]
+            # Calculates Euler angles
+            mu_guess = np.asin(-tangent[:, 2])
+            phi_guess = np.arctan2(normal[:, 2], binormal[:, 2])
+            theta_guess = np.arctan2(tangent[:, 1], tangent[:, 0])
 
-        # Calculates Euclidean angles
-        mu_guess = np.asin(-tangent[:, 2])
-        theta_guess = np.arctan2(tangent[:, 1], tangent[:, 0])
-        phi_guess = np.asin(normal[:, 2] / np.cos(mu_guess))
-        theta_arr.append(theta_guess)
+            # Theta needs adjustment for accumulation
+            if last_theta_guess is None:
+                last_theta_guess = theta_guess[0]
+            for i, theta in enumerate(theta_guess):
+                diff = theta - last_theta_guess
+                while diff > np.pi:
+                    theta_guess[i:] -= 2 * np.pi
+                    diff = theta_guess[i] - last_theta_guess
+                while diff < -np.pi:
+                    theta_guess[i:] += 2 * np.pi
+                    diff = theta_guess[i] - last_theta_guess
+                last_theta_guess = theta_guess[i]
 
-        opti.set_initial(Q[k][:, 1], mu_guess)
-        opti.set_initial(Q[k][:, 2], phi_guess)
+            # Estimates left-right boundary lengths
+            nl_guess = np.linalg.norm(
+                (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T,
+                axis=1,
+            )
+            nr_guess = -np.linalg.norm(
+                (np.asarray(splev(t_tau, spline_r)) - np.asarray(splev(t_tau, spline_c))).T,
+                axis=1,
+            )
 
-        # Estimates left-right boundary lengths
-        nl_guess = np.linalg.norm(
-            (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T,
-            axis=1,
-        )
-        nr_guess = -np.linalg.norm(
-            (np.asarray(splev(t_tau, spline_r)) - np.asarray(splev(t_tau, spline_c))).T,
-            axis=1,
-        )
+            opti.set_initial(Q[k][:, 0], theta_guess)
+            opti.set_initial(Q[k][:, 1], mu_guess)
+            opti.set_initial(Q[k][:, 2], phi_guess)
+            opti.set_initial(Q[k][:, 3], nl_guess)
+            opti.set_initial(Q[k][:, 4], nr_guess)
 
-        opti.set_initial(Q[k][:, 3], nl_guess)
-        opti.set_initial(Q[k][:, 4], nr_guess)
+        else:
+            current_state = track.state(t_tau)
+            opti.set_initial(X[k], current_state[:, :3])
+            opti.set_initial(Q[k], current_state[:, 3:])
 
-    # Unwrapping / removing theta jump discontinuity
-    # TODO there are many more efficient ways to do this
-    last = theta_arr[0][0]
-    for k, seg in enumerate(theta_arr):
-        for i, theta in enumerate(seg):
-            diff = theta - last
-            while diff > np.pi or diff < -np.pi:
-                if diff > np.pi:
-                    seg[i] -= 2 * np.pi
-                elif diff < -np.pi:
-                    seg[i] += 2 * np.pi
-                diff = seg[i] - last
-            last = seg[i]
-        opti.set_initial(Q[k][:, 0], seg)
-    #     print(seg[0])
-    # print(theta_arr[-1][-1])
 
     # Initial conditions
-    x0 = splev(0, spline_c)
-    for i in range(3):
-        opti.subject_to(X[0][0, i] == x0[i])
+    # x0 = splev(0, spline_c)
+    # for i in range(3):
+    #     opti.subject_to(X[0][0, i] == x0[i])
 
     # Periodicity
     opti.subject_to(X[-1][-1, :] == X[0][0, :])
 
-    # opti.subject_to(sin(Q[-1][-1, 0]) == sin(Q[0][0, 0]))
-    # opti.subject_to(cos(Q[-1][-1, 0]) == cos(Q[0][0, 0]))
     opti.subject_to(Q[-1][-1, 0] == Q[0][0, 0] - 2 * pi)
     opti.subject_to(Q[-1][-1, 1:] == Q[0][0, 1:])
     opti.subject_to(dQ[-1][-1, :] == dQ[0][0, :])
-    opti.subject_to(ddQ[-1][-1, :] == ddQ[0][0, :])
 
     # Optimize!
     solver_options = {
-        "ipopt.print_level": 5,
+        "ipopt.print_level": 2,
         "print_time": 0,
         "ipopt.sb": "no",
         "ipopt.max_iter": 1000,
         "detect_simple_bounds": True,
         "ipopt.mu_strategy": "adaptive",
         "ipopt.nlp_scaling_method": "gradient-based",
-        "ipopt.bound_relax_factor": 1e-8,
-        "ipopt.honor_original_bounds": "yes",
+        "ipopt.bound_relax_factor": 0,
+        "ipopt.hessian_approximation": "exact",
+        "ipopt.derivative_test": "none",
     }
-
     opti.minimize(J)
     opti.solver("ipopt", solver_options)
     try:
         sol = opti.solve()
+        print("IPOPT solve iteration succeeded!")
     except:
         sol = opti.debug
+        print("IPOPT solve iteration failed...")
 
-    # Collect solution
-    # Matrices
-    solution_x = []
-    solution_q = []
-
-    # Per interval
-    X_sol = []
-    Q_sol = []
-
-    for k, segment_q in enumerate(Q):
-        segment_q = sol.value(segment_q)
-        Q_sol.append(segment_q)
-        for i in range(N[k] + 2):
-            solution_q.append(segment_q[i, :])
-
-    for k, segment_x in enumerate(X):
-        segment_x = sol.value(segment_x)
-        X_sol.append(segment_x)
-        for i in range(N[k] + 2):
-            solution_x.append(segment_x[i, :])
-
-    return np.asarray(solution_x), np.asarray(solution_q), X_sol, Q_sol
+    print(f"Final cost: {sol.value(J)}")
+    # Process solution
+    X_sol = [sol.value(seg) for seg in X]
+    Q_sol = [sol.value(seg) for seg in Q]
+    return X_sol, Q_sol
 
 
 def fit_track(
@@ -376,7 +361,7 @@ def fit_track(
     spline_l: BSpline,
     spline_r: BSpline,
     max_dist: float,
-    refinement_steps: int = 3,
+    refinement_steps: int = 5,
 ) -> Track:
     """
     Fits a Track object
@@ -391,7 +376,7 @@ def fit_track(
     Returns:
         Track: _description_
     """
-    INITIAL_COLLOCATION = 5
+    INITIAL_COLLOCATION = 3
     INITIAL_POINTS = 10
 
     t = np.linspace(0, max_dist, INITIAL_POINTS)  # Mesh points
@@ -400,15 +385,16 @@ def fit_track(
     )  # Collocation points per interval
 
     # Initial track
-    X, Q, X_mat, Q_mat = fit_iteration(t, N, spline_c, spline_l, spline_r)
-    track = Track(Q_mat, X_mat, t)
+    X, Q = fit_iteration(t, N, spline_c, spline_l, spline_r)
+    track = Track(Q, X, t)
 
     # Refinement
     for i in range(refinement_steps):
         print(f"Refinement step {i + 1}/{refinement_steps}")
         N, t = mesh_refinement_iteration(track, t, N, spline_c, spline_l, spline_r)
-        X, Q, X_mat, Q_mat = fit_iteration(t, N, spline_c, spline_l, spline_r)
-        track = Track(Q_mat, X_mat, t)
+        print(f"Fitting with {len(N)} segments with a segment maximum of {max(N)} collocation points and total sum of {N.sum()} collocation points")
+        X, Q = fit_iteration(t, N, spline_c, spline_l, spline_r, track=track)
+        track = Track(Q, X, t)
 
     return track
 
@@ -421,7 +407,7 @@ def mesh_refinement_iteration(
     spline_l: BSpline,
     spline_r: BSpline,
     resolution=0.5,
-    variation_thres=0.7,
+    variation_thres=1.0,
     divides=3,
     degree_increase=5,
     initial_points=10,
@@ -447,30 +433,28 @@ def mesh_refinement_iteration(
     Returns:
         tuple[np.ndarray, np.ndarray]: Refined N and t
     """
-    print(N.shape, t.shape)
+    print("Beginning Mesh Refinement...")
 
-    # Start t of each interval
-    interval_starts = track.t[:-1]
+    interval_starts = track.t[:-1]  # Start t of each interval
     new_t, new_N = [t.min()], []
     interval_costs = []
     geo_mean_cost = 0
 
-    deg = 0
-    div = 0
-    skip = 0
+    deg_counter = 0
+    div_counter = 0
+    skip_counter = 0
 
     for i, start_t in enumerate(interval_starts):
         end_t = track.t[i + 1]
 
         # Sample t, remove first so it cannot be added multiple times
-        # assert end_t != start_t
         sample_t = np.linspace(
             start_t, end_t, math.ceil((end_t - start_t) / resolution)
         )[1:]
 
         # Sample state at each t as well as its derivative
         states = track.state(sample_t)
-        control = track.der_state(sample_t, der=2)
+        control = track.der_state(sample_t, n=2)
 
         # Compute costs across interval i at the end of each t
         costs = np.asarray(
@@ -501,27 +485,22 @@ def mesh_refinement_iteration(
         )[1:]
 
         costs = interval_costs[i]
-        
+
         stdev = costs.std()
         mean = costs.mean()
-
-        print(mean, geo_mean_cost)
 
         if mean < geo_mean_cost:
             new_N.append(N[i])
             new_t.append(end_t)
-            print("interval is good")
-            skip += 1
+            skip_counter += 1
             continue
 
-        print("variation", stdev / mean)
         total = np.sum(costs)
 
         if stdev / mean > variation_thres:
             # Divide
-            div += 1
+            div_counter += 1
             cumulative = 0
-
 
             for j, c in enumerate(costs):
                 cumulative += c
@@ -537,12 +516,12 @@ def mesh_refinement_iteration(
 
         else:
             # Increase degree
-            deg += 1
+            deg_counter += 1
             new_N.append(N[i] + degree_increase)
 
             new_t.append(end_t)
 
-    print(f"Degree increased: {deg}\tDivided: {div}\tSkipped: {skip}")
+    print(f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}")
     print(np.asarray(new_N).shape, np.asarray(new_t).shape)
     assert len(new_N) + 1 == len(new_t)
     return np.asarray(new_N), np.asarray(new_t)

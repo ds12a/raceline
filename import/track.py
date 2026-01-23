@@ -24,7 +24,6 @@ class Track:
         # [x, y, z, theta, mu, phi, n_l, n_r]
         # List of the interpolated polynomial over each interval
         self.poly = []
-
         self.length = t[-1]
 
         for k in range(len(Q)):
@@ -52,7 +51,6 @@ class Track:
         """
         state = self.state(s)
         b_l, b_r = self._find_boundaries(state)
-
         return np.column_stack([b_l, b_r, state[:, :3]])
 
     def state(self, s: np.ndarray) -> np.ndarray:
@@ -74,15 +72,15 @@ class Track:
             [self.poly[interval](parameter) for parameter, interval in zip(tau, k)]
         )
 
-    def der_state(self, s: np.ndarray, der=1) -> np.ndarray:
+    def der_state(self, s: np.ndarray, n=1) -> np.ndarray:
         """
-        Computes the der derivative of states (X, Q) at given arc length parameters
+        Computes the nth derivative of states (X, Q) at given arc length parameters
 
         Args:
             s (np.ndarray): Array of arc length parameters
 
         Returns:
-            np.ndarray: Array containing the der deriviative of states
+            np.ndarray: Array containing the nth derivative of states
                         [x, y, z, theta, mu, phi, n_l, n_r] for each given arc length parameter
         """
         s %= self.length
@@ -91,7 +89,7 @@ class Track:
         tau, k = self.t_to_tau(s)
         return np.asarray(
             [
-                self.poly[interval].derivative(parameter, der=der)
+                self.poly[interval].derivative(parameter, der=n)
                 for parameter, interval in zip(tau, k)
             ]
         )
@@ -134,7 +132,7 @@ class Track:
             line=dict(color=np.arange(len(X_matrix)), colorscale="plasma"),
         )
 
-    def plot_uniform(self, approx_spacing):
+    def plot_uniform(self, approx_spacing=2):
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         points = self(s)
         _, _, _, theta, mu, phi, _, _ = self.state(s).T
