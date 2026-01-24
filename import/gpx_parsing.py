@@ -13,7 +13,6 @@ import plotly.graph_objects as go
 
 matplotlib.use("Qt5Agg")
 
-FILE = "Zandvoort.gpx"
 RESOLUTION = 15.0  # meters
 
 
@@ -146,7 +145,7 @@ def read_gpx_splines(source):
             elif t.name == "Inside":
                 i = 1
             else:
-                raise ValueError(f"{FILE} must contain only tracks 'Outside' and 'Inside'")
+                raise ValueError(f"{source} must contain only tracks 'Outside' and 'Inside'")
 
             for s in t.segments:
                 for p in s.points:
@@ -165,7 +164,7 @@ def read_gpx_splines(source):
             elif t.name == "Inside":
                 i = 1
             else:
-                raise ValueError(f"{FILE} must contain only tracks 'Outside' and 'Inside'")
+                raise ValueError(f"{source} must contain only tracks 'Outside' and 'Inside'")
             
             for p in t.points:
                 x, y = trm.transform(p.longitude, p.latitude)
@@ -202,6 +201,7 @@ def read_gpx_splines(source):
 
 
 if __name__ == "__main__":
+    FILE = "Zandvoort.gpx"
     s_track = [0, 0, 0]
     track, (
         max_dist,
