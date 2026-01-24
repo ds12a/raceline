@@ -50,26 +50,38 @@
                     <h1 class="modulename">
 <a href="./../raceline.html">raceline</a><wbr>.import    </h1>
 
-                        <div class="docstring"><p>A repository containing tools to generate a smooth and periodic racetrack from boundary points measured with noisy GPS or other methods.</p>
+                        <div class="docstring"><p>Module for track generation.</p>
 
-<p>Formulates an Optimal Control Problem that is solved with CasADi.</p>
+<p>usage: import.py [-h] --gpx_source GPX_SOURCE [--track_destination TRACK_DESTINATION] [--config CONFIG] [--plot]</p>
 
-<p>In the future: generation of minimum-time trajectories (racing lines) around racetrack models</p>
-
-<p>References</p>
-
-<p>Giacomo Perantoni and David JN Limebeer. Optimal control of a formula one car on a
-three-dimensional track—part 1: Track modeling and identification. Journal of Dynamic
-Systems, Measurement, and Control, 137(5):051018, 2015.</p>
+<p>options:
+  -h, --help            show this help message and exit
+  --gpx_source GPX_SOURCE
+                        Source path to track gpx file.
+  --track_destination TRACK_DESTINATION
+                        Destination path of fitted track.
+  --config CONFIG       Path to config file.
+  --plot                Toggles on plotting.</p>
 </div>
 
                         <input id="mod-import-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
 
                         <label class="view-source-button" for="mod-import-view-source"><span>View Source</span></label>
 
-                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">1</span></a><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-2"><a href="#L-2"><span class="linenos">2</span></a><span class="sd">.. include:: ../README.md</span>
-</span><span id="L-3"><a href="#L-3"><span class="linenos">3</span></a><span class="sd">&quot;&quot;&quot;</span>
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos"> 1</span></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-2"><a href="#L-2"><span class="linenos"> 2</span></a><span class="sd">Module for track generation.</span>
+</span><span id="L-3"><a href="#L-3"><span class="linenos"> 3</span></a>
+</span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a><span class="sd">usage: import.py [-h] --gpx_source GPX_SOURCE [--track_destination TRACK_DESTINATION] [--config CONFIG] [--plot]</span>
+</span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a>
+</span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a><span class="sd">options:</span>
+</span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a><span class="sd">  -h, --help            show this help message and exit</span>
+</span><span id="L-8"><a href="#L-8"><span class="linenos"> 8</span></a><span class="sd">  --gpx_source GPX_SOURCE</span>
+</span><span id="L-9"><a href="#L-9"><span class="linenos"> 9</span></a><span class="sd">                        Source path to track gpx file.</span>
+</span><span id="L-10"><a href="#L-10"><span class="linenos">10</span></a><span class="sd">  --track_destination TRACK_DESTINATION</span>
+</span><span id="L-11"><a href="#L-11"><span class="linenos">11</span></a><span class="sd">                        Destination path of fitted track.</span>
+</span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a><span class="sd">  --config CONFIG       Path to config file.</span>
+</span><span id="L-13"><a href="#L-13"><span class="linenos">13</span></a><span class="sd">  --plot                Toggles on plotting.</span>
+</span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a><span class="sd">&quot;&quot;&quot;</span>
 </span></pre></div>
 
 
