@@ -38,9 +38,9 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
         spline_c: BSpline,
         spline_l: BSpline,
         spline_r: BSpline,
-        w_c: float = 1e-3,
-        w_l: float = 1e-3,
-        w_r: float = 1e-3,
+        w_c: float = 1e-2,
+        w_l: float = 1e-2,
+        w_r: float = 1e-2,
     ):
         """
         Computes tracking error
@@ -90,7 +90,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
             + w_r * ((b_r[0] - x_r) ** 2 + (b_r[1] - y_r) ** 2 + (b_r[2] - z_r) ** 2)
         )
 
-    def r_c(u, w_theta=3e3, w_mu=1e9, w_phi=1e9):
+    def r_c(u, w_theta=3e3, w_mu=1e9, w_phi=2e8):
         """
         Computes the error term that penalizes track curvature
         r_c = w_theta * dd_theta^2 + w_mu * dd_mu^2 + w_phi * dd_phi^2
@@ -106,7 +106,7 @@ def g(t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
         """
         return w_theta * u[0] ** 2 + w_mu * u[1] ** 2 + w_phi * u[2] ** 2
 
-    def r_w(u, w_n_l=3e7, w_n_r=3e7):
+    def r_w(u, w_n_l=2e7, w_n_r=2e7):
         """
         Computes the error term that penalizes track boundary noise
         r_w = w_n_l * dd_n_l^2 + w_n_r * dd_n_r^2
@@ -329,12 +329,13 @@ def fit_iteration(
 
     # Optimize!
     solver_options = {
-        "ipopt.print_level": 2,
+        "ipopt.print_level": 5,
+        "ipopt.print_frequency_iter": 50,
         "print_time": 0,
         "ipopt.sb": "no",
         "ipopt.max_iter": 1000,
         "detect_simple_bounds": True,
-        "ipopt.linear_solver": "ma97",
+        # "ipopt.linear_solver": "ma97",
         "ipopt.mu_strategy": "adaptive",
         "ipopt.nlp_scaling_method": "gradient-based",
         "ipopt.bound_relax_factor": 0,
@@ -395,7 +396,7 @@ def fit_track(
         print(f"Refinement step {i + 1}/{refinement_steps}")
         N, t = mesh_refinement_iteration(track, t, N, spline_c, spline_l, spline_r)
         print(f"Fitting with {len(N)} segments with a segment maximum of {max(N)} collocation points and total sum of {N.sum()} collocation points")
-        X, Q = fit_iteration(t, N, spline_c, spline_l, spline_r, track=track)
+        X, Q = fit_iteration(t, N, spline_c, spline_l, spline_r, track=None)
         track = Track(Q, X, t)
 
     return track
@@ -542,7 +543,7 @@ if __name__ == "__main__":
         s_track[0],
         s_track[1],
         s_track[2],
-    ) = read_gpx_splines("Monza_better.gpx")
+    ) = read_gpx_splines("Zandvoort.gpx")
 
     # Visualize original data
     plots = []
