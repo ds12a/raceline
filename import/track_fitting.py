@@ -67,6 +67,7 @@ def fit_iteration(
 
     Returns:
         Track: Fitted Track object from this iteration.
+        float: Final cost achieved.
     """
 
     print("Running iteration of collocation fitting...")
@@ -222,8 +223,8 @@ def fit_iteration(
         opti.solver("ipopt", ipopt_settings)
     except Exception as e:
         if "ipopt.linear_solver" in ipopt_settings:
-            print(f"Could not use solver {ipopt_settings["ipopt.linear_solver"]}, using default!")
-            del ipopt_settings["ipopt.linear_solver"]
+            print(f"Could not use solver {ipopt_settings['ipopt.linear_solver']}, using default!")
+            ipopt_settings["ipopt.linear_solver"] = "mumps"
             opti.solver("ipopt", ipopt_settings)
 
         else:
@@ -243,7 +244,7 @@ def fit_iteration(
     # Process solution
     X_sol = [sol.value(seg) for seg in X]
     Q_sol = [sol.value(seg) for seg in Q]
-    return Track(Q_sol, X_sol, t)
+    return Track(Q_sol, X_sol, t), sol.value(J)
 
 
 def fit_track(
@@ -280,7 +281,10 @@ def fit_track(
     )  # Collocation points per interval
 
     # Initial track
-    track = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw)
+    track, best_cost = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw)
+
+    best_eval = track
+    best_iter = 0
 
     # Refinement
     for i in range(refinement_steps):
@@ -291,10 +295,16 @@ def fit_track(
         print(
             f"Fitting with {len(N)} segments with a segment maximum of {max(N)} collocation points and total sum of {N.sum()} collocation points"
         )
-        track = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw)
+        track, new_cost = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw)
+
+        if new_cost < best_cost:
+            best_eval = track
+            best_iter = i + 1
+            best_cost = new_cost
 
     track.ccw = ccw
-    return track
+    print(f"Fitting finished. Chose iteration {best_iter} with cost evaluation {best_cost}.")
+    return best_eval
 
 
 def mesh_refinement_iteration(
