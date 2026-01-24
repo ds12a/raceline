@@ -1,0 +1,49 @@
+%YAML 1.1
+---
+
+# Configuration for track fitting module
+track_fitting:
+  # Ipopt options
+  ipopt:
+    ipopt.print_level: 5
+    ipopt.print_frequency_iter: 50
+    print_time: 0
+    ipopt.sb: "no"
+    ipopt.max_iter: 1000
+    detect_simple_bounds: True
+    ipopt.mu_strategy: adaptive
+    ipopt.nlp_scaling_method: gradient-based
+    ipopt.bound_relax_factor: 0
+    ipopt.hessian_approximation: exact
+    ipopt.derivative_test: none
+    # ipopt.linear_solver: ma97
+
+  # Configurable weights for cost function
+  cost_weights:
+    # Boundary Adherence weights (center, left, right)
+    w_c: 1.0e-2
+    w_l: 1.0e-2
+    w_r: 1.0e-2
+
+    # Euler Angle Curvature weights
+    w_theta: 6.0e+2
+    w_mu: 5.0e+7
+    w_phi: 5.0e+7
+
+    # Boundary Noise weights
+    w_n_l: 5.0e+4
+    w_n_r: 5.0e+4
+
+  # Mesh refinement options
+  refinement:
+    # Basic refinement configs
+    initial_collocation: 5 # Number of collocation points per segment initially
+    initial_mesh_points: 15 # Number of mesh points initially
+    refinement_steps: 8 # Number of refinement steps to perform
+
+    # Lower level parameters relating to the mesh refinement process
+    config:
+      sampling_resolution: 0.5 # Cost function sampling resolution
+      variation_threshold: 1.0 # Threshold of variation to choose between h and p refinement
+      h_divisions: 4 # Number of mesh points added when h-refining a segment
+      p_degree_increase: 5 # Degree added when p-refining a segment

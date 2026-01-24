@@ -222,7 +222,6 @@ def fit_iteration(
 
     opti.subject_to(Q[-1][-1, 0] == Q[0][0, 0] - 2 * pi)
     opti.subject_to(Q[-1][-1, 1:] == Q[0][0, 1:])
-    opti.subject_to(dQ[-1][-1, :] == dQ[0][0, :])
 
     # Optimize!
     opti.minimize(J)
@@ -250,6 +249,7 @@ def fit_track(
     spline_r: BSpline,
     max_dist: float,
     settings: dict,
+    ccw = False,
 ) -> Track:
     """
     Fits a Track object
@@ -287,6 +287,7 @@ def fit_track(
         )
         track = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"])
 
+    track.ccw = ccw
     return track
 
 

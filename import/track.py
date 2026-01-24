@@ -6,7 +6,7 @@ import json
 
 class Track:
 
-    def __init__(self, Q: list[np.ndarray], X: list[np.ndarray], t: np.ndarray):
+    def __init__(self, Q: list[np.ndarray], X: list[np.ndarray], t: np.ndarray, ccw = False):
         """
         Constructs a track object, which produces the track state at any
         valid arc length parameter
@@ -20,6 +20,8 @@ class Track:
         self.Q = Q
         self.X = X
         self.t = t
+
+        self.ccw = ccw
 
         # [x, y, z, theta, mu, phi, n_l, n_r]
         # List of the interpolated polynomial over each interval
