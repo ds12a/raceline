@@ -66,7 +66,7 @@ def fit_iteration(
 
     Returns:
         Track: Fitted Track object from this iteration.
-    """    
+    """
 
     print("Running iteration of collocation fitting...")
 
@@ -160,9 +160,7 @@ def fit_iteration(
             # Creates TNB vectors to find Euler angles
             tangent = np.asarray(splev(t_tau, spline_c, der=1)).T
             tangent = tangent / np.linalg.norm(tangent, axis=1)[:, np.newaxis]
-            normal = (
-                np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))
-            ).T
+            normal = (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T
             normal = normal / np.linalg.norm(normal, axis=1)[:, np.newaxis]
             binormal = np.cross(tangent, normal)
             normal = np.cross(binormal, tangent)  # Recalculates N to remove skew
@@ -187,17 +185,11 @@ def fit_iteration(
 
             # Estimates left-right boundary lengths
             nl_guess = np.linalg.norm(
-                (
-                    np.asarray(splev(t_tau, spline_l))
-                    - np.asarray(splev(t_tau, spline_c))
-                ).T,
+                (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T,
                 axis=1,
             )
             nr_guess = -np.linalg.norm(
-                (
-                    np.asarray(splev(t_tau, spline_r))
-                    - np.asarray(splev(t_tau, spline_c))
-                ).T,
+                (np.asarray(splev(t_tau, spline_r)) - np.asarray(splev(t_tau, spline_c))).T,
                 axis=1,
             )
 
@@ -225,7 +217,17 @@ def fit_iteration(
 
     # Optimize!
     opti.minimize(J)
-    opti.solver("ipopt", ipopt_settings)
+    try:
+        opti.solver("ipopt", ipopt_settings)
+    except Exception as e:
+        if "ipopt.linear_solver" in ipopt_settings:
+            print(f"Could not use solver {ipopt_settings["ipopt.linear_solver"]}, using default!")
+            del ipopt_settings["ipopt.linear_solver"]
+            opti.solver("ipopt", ipopt_settings)
+
+        else:
+            raise e
+
     print(f"Solving with {opti.nx} variables.")
     try:
         sol = opti.solve()
@@ -249,7 +251,7 @@ def fit_track(
     spline_r: BSpline,
     max_dist: float,
     settings: dict,
-    ccw = False,
+    ccw: bool = False,
 ) -> Track:
     """
     Fits a Track object
@@ -260,6 +262,7 @@ def fit_track(
         spline_r (BSpline): Scipy BSpline for right boundary
         max_dist (float): Length of track
         refinement_settings (dict): Contains refinement settings as defined in default.yaml
+        ccw (bool): Indicates if track is counter clockwise
 
     Returns:
         Track: _description_
@@ -281,7 +284,9 @@ def fit_track(
     # Refinement
     for i in range(refinement_steps):
         print(f"Refinement step {i + 1}/{refinement_steps}")
-        N, t = mesh_refinement_iteration(track, t, N, spline_c, spline_l, spline_r, cost_fn, settings["refinement"]["config"])
+        N, t = mesh_refinement_iteration(
+            track, t, N, spline_c, spline_l, spline_r, cost_fn, settings["refinement"]["config"]
+        )
         print(
             f"Fitting with {len(N)} segments with a segment maximum of {max(N)} collocation points and total sum of {N.sum()} collocation points"
         )
@@ -339,9 +344,7 @@ def mesh_refinement_iteration(
 
         # Sample t, remove first so it cannot be added multiple times
         # assert end_t != start_t
-        sample_t = np.linspace(
-            start_t, end_t, math.ceil((end_t - start_t) / resolution)
-        )[1:]
+        sample_t = np.linspace(start_t, end_t, math.ceil((end_t - start_t) / resolution))[1:]
         samples.append(sample_t)
 
         # Sample state at each t as well as its derivative
@@ -413,9 +416,7 @@ def mesh_refinement_iteration(
 
             new_t.append(end_t)
 
-    print(
-        f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}"
-    )
+    print(f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}")
     assert len(new_N) + 1 == len(new_t)
     return np.asarray(new_N), np.asarray(new_t)
 

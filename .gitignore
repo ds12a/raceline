@@ -1,2 +1,3 @@
 venv
 generated/*.json
+**/__pycache__

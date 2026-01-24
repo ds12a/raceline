@@ -16,7 +16,7 @@ track_fitting:
     ipopt.bound_relax_factor: 0
     ipopt.hessian_approximation: exact
     ipopt.derivative_test: none
-    # ipopt.linear_solver: ma97
+    ipopt.linear_solver: ma97
 
   # Configurable weights for cost function
   cost_weights:

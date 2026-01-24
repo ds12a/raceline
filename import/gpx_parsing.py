@@ -72,9 +72,7 @@ def parameterized_interpolation(
     )
 
 
-def interpolate(
-    sample: np.ndarray, spacing: float = 1.0, accurate_param=False
-) -> np.ndarray:
+def interpolate(sample: np.ndarray, spacing: float = 1.0, accurate_param=False) -> np.ndarray:
     """
     Fits polynomial splines to the given sample and returns a new array with
     evenly spaced points sampled from the splines. We approximate the total distance
@@ -165,7 +163,7 @@ def read_gpx_splines(source):
                 i = 1
             else:
                 raise ValueError(f"{source} must contain only tracks 'Outside' and 'Inside'")
-            
+
             for p in t.points:
                 x, y = trm.transform(p.longitude, p.latitude)
 
@@ -174,7 +172,6 @@ def read_gpx_splines(source):
                 track[i][1].append(y)
                 track[i][2].append(p.elevation)
             track[i] = np.asarray(track[i])
-        
 
     # Set minimum elevation to 0
     print(len(track[0][2]), len(track[1][2]))

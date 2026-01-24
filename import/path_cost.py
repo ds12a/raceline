@@ -13,8 +13,8 @@ class PathCost:
 
         Raises:
             ValueError: When weights is not in the expected format.
-        """        
-        
+        """
+
         WEIGHTS = {"w_c", "w_r", "w_l", "w_theta", "w_mu", "w_phi", "w_n_l", "w_n_r"}
 
         for key, value in weights.items():
@@ -28,9 +28,7 @@ class PathCost:
                 f"Invalid number of weights provided, need {len(WEIGHTS)}, got {len(weights)}"
             )
 
-    def __call__(
-        self, t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline
-    ):
+    def __call__(self, t: float, x, q, u, spline_c: BSpline, spline_l: BSpline, spline_r: BSpline):
         """
         Calculates path error g(t) at a specific t.
         For track fitting, used both for computing the symbolic cost in CasADi
@@ -103,10 +101,8 @@ class PathCost:
 
         return (
             self.w_c * ((x[0] - x_c) ** 2 + (x[1] - y_c) ** 2 + (x[2] - z_c) ** 2)
-            + self.w_l
-            * ((b_l[0] - x_l) ** 2 + (b_l[1] - y_l) ** 2 + (b_l[2] - z_l) ** 2)
-            + self.w_r
-            * ((b_r[0] - x_r) ** 2 + (b_r[1] - y_r) ** 2 + (b_r[2] - z_r) ** 2)
+            + self.w_l * ((b_l[0] - x_l) ** 2 + (b_l[1] - y_l) ** 2 + (b_l[2] - z_l) ** 2)
+            + self.w_r * ((b_r[0] - x_r) ** 2 + (b_r[1] - y_r) ** 2 + (b_r[2] - z_r) ** 2)
         )
 
     def r_c(self, u):
