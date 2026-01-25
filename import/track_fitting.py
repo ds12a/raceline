@@ -130,6 +130,7 @@ def fit_iteration(
         # Continuity constraints
         if k != 0:
             opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
+            opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
 
         # Collocation constraints (enforces dynamics on X)
         theta = Q[k][:-1, 0]
@@ -211,6 +212,7 @@ def fit_iteration(
 
     opti.subject_to(Q[-1][-1, 0] == Q[0][0, 0] + 2 * pi * (1 if ccw else -1))
     opti.subject_to(Q[-1][-1, 1:] == Q[0][0, 1:])
+    opti.subject_to(dQ[-1][-1, 1:] == dQ[0][0, 1:])
 
     # Optimize!
     opti.minimize(J)
@@ -376,7 +378,7 @@ def mesh_refinement_iteration(
         # Compute costs across interval i at the end of each t
         _, costs = cost_fn.sample_cost(track, sample_t)
 
-        geo_mean_cost += np.log(costs.max())
+        geo_mean_cost += np.log(costs.mean())
 
         interval_costs.append(costs)
 
@@ -406,17 +408,20 @@ def mesh_refinement_iteration(
             cumulative = 0
             initial_points = math.ceil(N[i] / (divides + 1))
 
-            for j, c in enumerate(costs):
-                if cumulative > total / divides:
-                    cumulative = 0
+            new_N.extend([initial_points] * (divides + 1))
+            new_t.extend(np.linspace(start_t, end_t, divides + 2)[1:])
 
-                    new_N.append(initial_points)
-                    new_t.append(sample_t[j])
-                cumulative += c
+            # for j, c in enumerate(costs):
+            #     if cumulative > total / divides:
+            #         cumulative = 0
 
-            if abs(end_t - new_t[-1]) > 1e-7:
-                new_N.append(initial_points)
-                new_t.append(end_t)
+            #         new_N.append(initial_points)
+            #         new_t.append(sample_t[j])
+            #     cumulative += c
+
+            # if abs(end_t - new_t[-1]) > 1e-7:
+            #     new_N.append(initial_points)
+            #     new_t.append(end_t)
 
         else:
             # Increase degree

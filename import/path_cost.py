@@ -83,7 +83,7 @@ class PathCost:
         # Compute costs across all given t
         costs = np.fromiter(
             (
-                self(sample_t[j], state[:3], state[3:], control[j])
+                self(sample_t[j], state[:3], state[3:], control[j][3:])
                 for j, state in enumerate(states)
             ),
             dtype=np.float64,
