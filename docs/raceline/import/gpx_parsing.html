@@ -63,16 +63,16 @@
 
                         <label class="view-source-button" for="mod-gpx_parsing-view-source"><span>View Source</span></label>
 
-                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">  1</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-</span><span id="L-2"><a href="#L-2"><span class="linenos">  2</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span>
-</span><span id="L-3"><a href="#L-3"><span class="linenos">  3</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-</span><span id="L-4"><a href="#L-4"><span class="linenos">  4</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">gpxpy</span>
-</span><span id="L-5"><a href="#L-5"><span class="linenos">  5</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">gpxpy.gpx</span>
-</span><span id="L-6"><a href="#L-6"><span class="linenos">  6</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">pyproj</span><span class="w"> </span><span class="kn">import</span> <span class="n">Transformer</span>
-</span><span id="L-7"><a href="#L-7"><span class="linenos">  7</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.interpolate</span><span class="w"> </span><span class="kn">import</span> <span class="n">splev</span><span class="p">,</span> <span class="n">splprep</span><span class="p">,</span> <span class="n">BSpline</span>
-</span><span id="L-8"><a href="#L-8"><span class="linenos">  8</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial</span><span class="w"> </span><span class="kn">import</span> <span class="n">KDTree</span>
-</span><span id="L-9"><a href="#L-9"><span class="linenos">  9</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.express</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">px</span>
-</span><span id="L-10"><a href="#L-10"><span class="linenos"> 10</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">  1</span></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</span><span id="L-2"><a href="#L-2"><span class="linenos">  2</span></a><span class="kn">import</span> <span class="nn">matplotlib</span>
+</span><span id="L-3"><a href="#L-3"><span class="linenos">  3</span></a><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+</span><span id="L-4"><a href="#L-4"><span class="linenos">  4</span></a><span class="kn">import</span> <span class="nn">gpxpy</span>
+</span><span id="L-5"><a href="#L-5"><span class="linenos">  5</span></a><span class="kn">import</span> <span class="nn">gpxpy.gpx</span>
+</span><span id="L-6"><a href="#L-6"><span class="linenos">  6</span></a><span class="kn">from</span> <span class="nn">pyproj</span> <span class="kn">import</span> <span class="n">Transformer</span>
+</span><span id="L-7"><a href="#L-7"><span class="linenos">  7</span></a><span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">splev</span><span class="p">,</span> <span class="n">splprep</span><span class="p">,</span> <span class="n">BSpline</span>
+</span><span id="L-8"><a href="#L-8"><span class="linenos">  8</span></a><span class="kn">from</span> <span class="nn">scipy.spatial</span> <span class="kn">import</span> <span class="n">KDTree</span>
+</span><span id="L-9"><a href="#L-9"><span class="linenos">  9</span></a><span class="kn">import</span> <span class="nn">plotly.express</span> <span class="k">as</span> <span class="nn">px</span>
+</span><span id="L-10"><a href="#L-10"><span class="linenos"> 10</span></a><span class="kn">import</span> <span class="nn">plotly.graph_objects</span> <span class="k">as</span> <span class="nn">go</span>
 </span><span id="L-11"><a href="#L-11"><span class="linenos"> 11</span></a>
 </span><span id="L-12"><a href="#L-12"><span class="linenos"> 12</span></a>
 </span><span id="L-13"><a href="#L-13"><span class="linenos"> 13</span></a><span class="n">matplotlib</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;Qt5Agg&quot;</span><span class="p">)</span>
@@ -80,7 +80,7 @@
 </span><span id="L-15"><a href="#L-15"><span class="linenos"> 15</span></a><span class="n">RESOLUTION</span> <span class="o">=</span> <span class="mf">15.0</span>  <span class="c1"># meters</span>
 </span><span id="L-16"><a href="#L-16"><span class="linenos"> 16</span></a>
 </span><span id="L-17"><a href="#L-17"><span class="linenos"> 17</span></a>
-</span><span id="L-18"><a href="#L-18"><span class="linenos"> 18</span></a><span class="k">def</span><span class="w"> </span><span class="nf">parameterized_interpolation</span><span class="p">(</span>
+</span><span id="L-18"><a href="#L-18"><span class="linenos"> 18</span></a><span class="k">def</span> <span class="nf">parameterized_interpolation</span><span class="p">(</span>
 </span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a>    <span class="n">track</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
 </span><span id="L-20"><a href="#L-20"><span class="linenos"> 20</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">BSpline</span><span class="p">,</span> <span class="n">BSpline</span><span class="p">,</span> <span class="n">BSpline</span><span class="p">]:</span>
 </span><span id="L-21"><a href="#L-21"><span class="linenos"> 21</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -136,7 +136,7 @@
 </span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a>    <span class="p">)</span>
 </span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a>
 </span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a>
-</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a><span class="k">def</span><span class="w"> </span><span class="nf">interpolate</span><span class="p">(</span><span class="n">sample</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">accurate_param</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a><span class="k">def</span> <span class="nf">interpolate</span><span class="p">(</span><span class="n">sample</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">accurate_param</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a><span class="sd">    Fits polynomial splines to the given sample and returns a new array with</span>
 </span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a><span class="sd">    evenly spaced points sampled from the splines. We approximate the total distance</span>
@@ -186,7 +186,7 @@
 </span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a>    <span class="k">return</span> <span class="n">target_dist</span><span class="p">,</span> <span class="n">sampled</span><span class="p">,</span> <span class="n">spline</span>
 </span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>
 </span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a>
-</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a><span class="k">def</span><span class="w"> </span><span class="nf">read_gpx_splines</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
+</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a><span class="k">def</span> <span class="nf">read_gpx_splines</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
 </span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a>    <span class="c1"># Reads gpx file</span>
 </span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
 </span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>        <span class="n">gpx</span> <span class="o">=</span> <span class="n">gpxpy</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
@@ -332,7 +332,7 @@
 
     </div>
     <a class="headerlink" href="#parameterized_interpolation"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="parameterized_interpolation-19"><a href="#parameterized_interpolation-19"><span class="linenos">19</span></a><span class="k">def</span><span class="w"> </span><span class="nf">parameterized_interpolation</span><span class="p">(</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="parameterized_interpolation-19"><a href="#parameterized_interpolation-19"><span class="linenos">19</span></a><span class="k">def</span> <span class="nf">parameterized_interpolation</span><span class="p">(</span>
 </span><span id="parameterized_interpolation-20"><a href="#parameterized_interpolation-20"><span class="linenos">20</span></a>    <span class="n">track</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
 </span><span id="parameterized_interpolation-21"><a href="#parameterized_interpolation-21"><span class="linenos">21</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">BSpline</span><span class="p">,</span> <span class="n">BSpline</span><span class="p">,</span> <span class="n">BSpline</span><span class="p">]:</span>
 </span><span id="parameterized_interpolation-22"><a href="#parameterized_interpolation-22"><span class="linenos">22</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -424,7 +424,7 @@ on accurate arc length parameterization</li>
 
     </div>
     <a class="headerlink" href="#interpolate"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="interpolate-75"><a href="#interpolate-75"><span class="linenos"> 75</span></a><span class="k">def</span><span class="w"> </span><span class="nf">interpolate</span><span class="p">(</span><span class="n">sample</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">accurate_param</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="interpolate-75"><a href="#interpolate-75"><span class="linenos"> 75</span></a><span class="k">def</span> <span class="nf">interpolate</span><span class="p">(</span><span class="n">sample</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">accurate_param</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="interpolate-76"><a href="#interpolate-76"><span class="linenos"> 76</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="interpolate-77"><a href="#interpolate-77"><span class="linenos"> 77</span></a><span class="sd">    Fits polynomial splines to the given sample and returns a new array with</span>
 </span><span id="interpolate-78"><a href="#interpolate-78"><span class="linenos"> 78</span></a><span class="sd">    evenly spaced points sampled from the splines. We approximate the total distance</span>
@@ -512,7 +512,7 @@ on accurate arc length parameterization</li>
 
     </div>
     <a class="headerlink" href="#read_gpx_splines"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="read_gpx_splines-125"><a href="#read_gpx_splines-125"><span class="linenos">125</span></a><span class="k">def</span><span class="w"> </span><span class="nf">read_gpx_splines</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="read_gpx_splines-125"><a href="#read_gpx_splines-125"><span class="linenos">125</span></a><span class="k">def</span> <span class="nf">read_gpx_splines</span><span class="p">(</span><span class="n">source</span><span class="p">):</span>
 </span><span id="read_gpx_splines-126"><a href="#read_gpx_splines-126"><span class="linenos">126</span></a>    <span class="c1"># Reads gpx file</span>
 </span><span id="read_gpx_splines-127"><a href="#read_gpx_splines-127"><span class="linenos">127</span></a>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
 </span><span id="read_gpx_splines-128"><a href="#read_gpx_splines-128"><span class="linenos">128</span></a>        <span class="n">gpx</span> <span class="o">=</span> <span class="n">gpxpy</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
