@@ -13,7 +13,7 @@
   ```--track_destination TRACK_DESTINATION```
                         Destination path of fitted track.
 
-  ````--config CONFIG```       Path to config file.
+  ```--config CONFIG```       Path to config file.
 
   ```--plot```                Toggles on plotting.
 """
