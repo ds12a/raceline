@@ -88,7 +88,7 @@ class PathCost:
             ),
             dtype=np.float64,
         )
-        
+
         return np.trapezoid(costs, x=sample_t), costs
 
     def e(self, t: float, x, q):

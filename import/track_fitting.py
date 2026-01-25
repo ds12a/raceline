@@ -145,9 +145,7 @@ def fit_iteration(
         # Quadrature enforcement
         for j in range(N[k]):
 
-            lagrange_term = cost_fn(
-                t_tau[j + 1], X[k][j + 1, :], Q[k][j + 1, :], ddQ[k][j + 1, :]
-            )
+            lagrange_term = cost_fn(t_tau[j + 1], X[k][j + 1, :], Q[k][j + 1, :], ddQ[k][j + 1, :])
 
             J += norm_factor * w[j] * lagrange_term
 
@@ -161,9 +159,7 @@ def fit_iteration(
             # Creates TNB vectors to find Euler angles
             tangent = np.asarray(splev(t_tau, spline_c, der=1)).T
             tangent = tangent / np.linalg.norm(tangent, axis=1)[:, np.newaxis]
-            normal = (
-                np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))
-            ).T
+            normal = (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T
             normal = normal / np.linalg.norm(normal, axis=1)[:, np.newaxis]
             binormal = np.cross(tangent, normal)
             normal = np.cross(binormal, tangent)  # Recalculates N to remove skew
@@ -188,17 +184,11 @@ def fit_iteration(
 
             # Estimates left-right boundary lengths
             nl_guess = np.linalg.norm(
-                (
-                    np.asarray(splev(t_tau, spline_l))
-                    - np.asarray(splev(t_tau, spline_c))
-                ).T,
+                (np.asarray(splev(t_tau, spline_l)) - np.asarray(splev(t_tau, spline_c))).T,
                 axis=1,
             )
             nr_guess = -np.linalg.norm(
-                (
-                    np.asarray(splev(t_tau, spline_r))
-                    - np.asarray(splev(t_tau, spline_c))
-                ).T,
+                (np.asarray(splev(t_tau, spline_r)) - np.asarray(splev(t_tau, spline_c))).T,
                 axis=1,
             )
 
@@ -240,9 +230,7 @@ def fit_iteration(
         opti.solver("ipopt", ipopt_settings)
     except Exception as e:
         if "ipopt.linear_solver" in ipopt_settings:
-            print(
-                f"Could not use solver {ipopt_settings['ipopt.linear_solver']}, using default!"
-            )
+            print(f"Could not use solver {ipopt_settings['ipopt.linear_solver']}, using default!")
             ipopt_settings["ipopt.linear_solver"] = "mumps"
             opti.solver("ipopt", ipopt_settings)
 
@@ -301,9 +289,7 @@ def fit_track(
     )  # Collocation points per interval
 
     # Initial track
-    track = fit_iteration(
-        t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw
-    )
+    track = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw)
 
     sample_t = np.linspace(
         0,
@@ -332,9 +318,7 @@ def fit_track(
         print(
             f"Fitting with {len(N)} segments with a segment maximum of {max(N)} collocation points and total sum of {N.sum()} collocation points"
         )
-        track = fit_iteration(
-            t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw
-        )
+        track = fit_iteration(t, N, spline_c, spline_l, spline_r, cost_fn, settings["ipopt"], ccw)
         new_cost, _ = cost_fn.sample_cost(track, sample_t)
 
         print(f"Sampled error: {new_cost:e}")
@@ -346,9 +330,7 @@ def fit_track(
 
     track.ccw = ccw
 
-    print(
-        f"Fitting finished. Chose iteration {best_iter} with cost evaluation {best_cost}."
-    )
+    print(f"Fitting finished. Chose iteration {best_iter} with cost evaluation {best_cost}.")
     return best_eval
 
 
@@ -400,9 +382,7 @@ def mesh_refinement_iteration(
 
         # Sample t, remove first so it cannot be added multiple times
         # assert end_t != start_t
-        sample_t = np.linspace(
-            start_t, end_t, math.ceil((end_t - start_t) / resolution)
-        )[1:]
+        sample_t = np.linspace(start_t, end_t, math.ceil((end_t - start_t) / resolution))[1:]
         samples.append(sample_t)
 
         # Compute costs across interval i at the end of each t
@@ -423,7 +403,6 @@ def mesh_refinement_iteration(
 
         stdev = costs.std()
         mean = gmean(costs)
-        max_cost = costs.max()
 
         if mean < geo_mean_cost:
             new_N.append(N[i])
@@ -437,18 +416,17 @@ def mesh_refinement_iteration(
             # Divide
             div_counter += 1
             cumulative = 0
-            initial_points = math.ceil(N[i] / (divides + 1))
-
-            # new_N.extend([initial_points] * (divides + 1))
-            # new_t.extend(np.linspace(start_t, end_t, divides + 2)[1:])
+            initial_points = max(
+                math.ceil(N[i] / (divides + 1)), config_settings["h_min_collocation"]
+            )
 
             for j, c in enumerate(costs):
-                if cumulative > total / (divides + 2):
+                cumulative += c
+                if cumulative > total / (divides + 1):
                     cumulative = 0
 
                     new_N.append(initial_points)
                     new_t.append(sample_t[j])
-                cumulative += c
 
             if abs(end_t - new_t[-1]) > 1e-7:
                 new_N.append(initial_points)
@@ -461,9 +439,7 @@ def mesh_refinement_iteration(
 
             new_t.append(end_t)
 
-    print(
-        f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}"
-    )
+    print(f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}")
     assert len(new_N) + 1 == len(new_t)
     return np.asarray(new_N), np.asarray(new_t)
 

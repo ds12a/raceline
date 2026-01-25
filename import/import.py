@@ -20,7 +20,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--track_destination",
-        default="track.json",
+        default="generated/track.json",
         type=str,
         help="Destination path of fitted track.",
     )

@@ -45,4 +45,5 @@ track_fitting:
       sampling_resolution: 0.5 # Cost function sampling resolution
       variation_threshold: 0.5 # Threshold of variation to choose between h and p refinement
       h_divisions: 2 # Number of mesh points added when h-refining a segment
+      h_min_collocation: 8 # Number of initial collocation points per new segment
       p_degree_increase: 5 # Degree added when p-refining a segment
