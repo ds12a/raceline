@@ -408,20 +408,20 @@ def mesh_refinement_iteration(
             cumulative = 0
             initial_points = math.ceil(N[i] / (divides + 1))
 
-            new_N.extend([initial_points] * (divides + 1))
-            new_t.extend(np.linspace(start_t, end_t, divides + 2)[1:])
+            # new_N.extend([initial_points] * (divides + 1))
+            # new_t.extend(np.linspace(start_t, end_t, divides + 2)[1:])
 
-            # for j, c in enumerate(costs):
-            #     if cumulative > total / divides:
-            #         cumulative = 0
+            for j, c in enumerate(costs):
+                if cumulative > total / (divides + 2):
+                    cumulative = 0
 
-            #         new_N.append(initial_points)
-            #         new_t.append(sample_t[j])
-            #     cumulative += c
+                    new_N.append(initial_points)
+                    new_t.append(sample_t[j])
+                cumulative += c
 
-            # if abs(end_t - new_t[-1]) > 1e-7:
-            #     new_N.append(initial_points)
-            #     new_t.append(end_t)
+            if abs(end_t - new_t[-1]) > 1e-7:
+                new_N.append(initial_points)
+                new_t.append(end_t)
 
         else:
             # Increase degree
