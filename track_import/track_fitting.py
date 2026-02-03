@@ -20,7 +20,7 @@ def generate_D(tau: np.ndarray) -> np.ndarray:
     Generates differentiation matrix using Barycentric weights
 
     Args:
-        tau (np.ndarray): 1D numpy array containing LG points and -1 and 1
+        tau (np.ndarray): 1D numpy array containing LG points and -1 and l
 
     Returns:
         D (np.ndarray): Differentiation matrix

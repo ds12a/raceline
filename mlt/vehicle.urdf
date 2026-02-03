@@ -3,8 +3,20 @@
 <robot name="vehicle">
 
     <!-- Links/frames follow the paper notation-->
-    <link name="b1"></link>
-    <link name="b2"></link>
+    <link name="b1">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0.0" ixz="0.0"
+                    iyy="1e-6" iyz="0.0" izz="1e-6"/>
+        </inertial>
+    </link>
+    <link name="b2">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0.0" ixz="0.0"
+                    iyy="1e-6" iyz="0.0" izz="1e-6"/>
+        </inertial>
+    </link>
     <link name="b3">
         <inertial>
             <mass value="1.0"/>
@@ -12,8 +24,20 @@
                     iyy="0.01" iyz="0.0" izz="0.01"/>
         </inertial>
     </link>
-    <link name="b4"></link>
-    <link name="b5"></link>
+    <link name="b4">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0.0" ixz="0.0"
+                    iyy="1e-6" iyz="0.0" izz="1e-6"/>
+        </inertial>
+    </link>
+    <link name="b5">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0.0" ixz="0.0"
+                    iyy="1e-6" iyz="0.0" izz="1e-6"/>
+        </inertial>
+    </link>
     <link name="b6">
         <inertial>
             <mass value="1.0"/>
