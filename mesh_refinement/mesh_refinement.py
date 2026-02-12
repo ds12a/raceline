@@ -15,9 +15,7 @@ class MeshRefinement:
         sample_res = self.conf["config"]["sampling_resolution"]
 
         # Generates initial set of mesh points
-        self.t = np.linspace(
-            self.colloc.start_t, self.colloc.end_t, initial_mesh_points
-        )
+        self.t = np.linspace(self.colloc.start_t, self.colloc.end_t, initial_mesh_points)
         self.N = np.array(
             [initial_collocation] * (initial_mesh_points - 1)
         )  # Collocation points per interval
@@ -53,11 +51,9 @@ class MeshRefinement:
                 best_iter = i + 1
                 best_cost = new_cost
 
-        track.ccw = ccw     # TODO what is this
+        track.ccw = ccw  # TODO what is this
 
-        print(
-            f"Fitting finished. Chose iteration {best_iter} with cost evaluation {best_cost}."
-        )
+        print(f"Fitting finished. Chose iteration {best_iter} with cost evaluation {best_cost}.")
         return best_eval
 
     def mesh_iteration(self):
@@ -83,9 +79,7 @@ class MeshRefinement:
 
             # Sample t, remove first so it cannot be added multiple times
             # assert end_t != start_t
-            sample_t = np.linspace(
-                start_t, end_t, math.ceil((end_t - start_t) / resolution)
-            )[1:]
+            sample_t = np.linspace(start_t, end_t, math.ceil((end_t - start_t) / resolution))[1:]
             samples.append(sample_t)
 
             # Compute costs across interval i at the end of each t
@@ -96,9 +90,7 @@ class MeshRefinement:
             interval_costs.append(costs)
 
         # TODO this is an approximation, check if it is satisfactory
-        geo_mean_cost = np.exp(
-            geo_mean_cost / ((track.t[-1] - track.t[0]) / resolution)
-        )
+        geo_mean_cost = np.exp(geo_mean_cost / ((track.t[-1] - track.t[0]) / resolution))
 
         for i, start_t in enumerate(interval_starts):
             end_t = track.t[i + 1]
@@ -144,8 +136,6 @@ class MeshRefinement:
 
                 new_t.append(end_t)
 
-        print(
-            f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}"
-        )
+        print(f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}")
         assert len(new_N) + 1 == len(new_t)
-        return np.asarray(new_N), np.asarray(new_t)
+        return np.array(new_N), np.array(new_t)

@@ -3,12 +3,13 @@ import numpy as np
 from track_import.track import Track
 import casadi as ca
 
+
 def foo():
     track = Track.load("placeholder")
 
     opti = ca.Opti()
 
-     # Q, dQ, ddQ are (N_k + 2) x (n_q).
+    # Q, dQ, ddQ are (N_k + 2) x (n_q).
     Q = []  # Array containing Q matrices. q_j = [theta, mu, phi, n_l, n_r].
     dQ = []  # Array containing dQ (1st der) matrices.
     ddQ = []  # Array containing ddQ (2nd der) matrices.

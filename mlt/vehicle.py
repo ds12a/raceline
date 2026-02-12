@@ -239,6 +239,31 @@ class Vehicle:
         w3e = ca.vertcat(X1 + X2, Y1 + Y2, Y1 * self.prop.g_a[0] - Y2 * self.prop.g_a[1])
         self.w3e_func = ca.Function("W3e", [f_z, u, v_3], [w3e])
 
+    def _init_fz_func(self):
+        """
+        Generates fz, the downforce calculated based on vehicle weight shifts and aerodynamic loads
+        """
+        u = ca.SX.sym("u", 3)  # Control [f_xa, f_xb, delta]
+        v_3 = ca.SX.sym("v_3", 6)  # Twist vector (frame 3)
+        f_z = ca.SX.sym("f_z", 2, 2)  # z forces on each wheel
+
+        f_za = ca.SX.sym("f_za") # Aerodynamic downforce TODO pass in or recalculate
+
+        f_xa, f_xb, delta = ca.vertsplit(u)
+        v_3x, v_3y, _, _, _, omega_3z = ca.vertsplit(v_3)
+        f_1z, f_2z = ca.vertsplit(f_z)
+        f_11z, f_12z = ca.horzsplit(f_1z)
+        f_21z, f_22z = ca.horzsplit(f_2z)
+
+        # Static load
+
+        # Aero downforce
+
+        # Longitudinal shift
+        
+        # Lateral shift
+
+
     def rnea(
         self,
         q_1: float,
@@ -253,28 +278,71 @@ class Vehicle:
         Performs RNEA
 
         Args:
-            q (np.ndarray): States of all the joints, including track
-            v (np.ndarray): _description_
-            a (np.ndarray): _description_
-            f_ext (list[cpin.Force]): _description_
+            q_1 (float): Normalized parameter [0, 1] indicating position along track
+            q_1_dot (ca.SX): First time derivative of q_1
+            q_1_ddot (ca.SX): Second time derivative of q_1
+            q (ca.SX): Joint positions excluding free floating joint
+            q_dot (ca.SX): First time derivatives of joint positions, excluding free floating joint
+            q_ddot (ca.SX): Second time derivatives of joint positions, excluding free floating joint
+            f_ext (list[cpin.Force]): External forces applied
 
         Returns:
             tuple[np.ndarray, tuple[float, float, float]]: Torques (τ1, ..., τ6) and structural wrench components (f3z, m3x, m3y)
         """
+
         # Calculates track position, vel, accel
-        trk_q = self.track.state(np.array([q_1]) * self.track.length)[0]
-        trk_v = self.track.der_state(np.array([q_1]) * self.track.length, n=1)[0]
-        trk_a = self.track.der_state(np.array([q_1]) * self.track.length, n=2)[0]
+        track_q = self.track.state(np.array([q_1]) * self.track.length)[0]
+        track_v_spacial = self.track.der_state(np.array([q_1]) * self.track.length, n=1)[0]
+        track_a_spacial = self.track.der_state(np.array([q_1]) * self.track.length, n=2)[0]
 
-        # Calculates SE3 (track joint position)
-        R = pin.rpy.rpyToMatrix(*trk_q[3:6][::-1])  # We store in zyx (yaw, pitch, roll)
-        p = np.array(trk_q[:3])
-        track_q = pin.SE3(R, p)
+        # Convert from [0, 1] normalized parameter to arc length to time derivative
+        track_v = track_v_spacial * self.track.length * q_1_dot
+        track_a = (
+            track_a_spacial * self.track.length**2 * q_1_dot**2
+            + track_v_spacial * self.track.length * q_1_ddot
+        )
 
-        # Calculates V (track velocity)
-        J = np.concatenate(
-            trk_v[:3] / np.linalg.norm(trk_v[:3]),
-            
+        # Compute rotation matrix from body to world
+        R = pin.rpy.rpyToMatrix(*track_q[3:6][::-1])  # We store in zyx (yaw, pitch, roll)
+
+        # Create full state
+        q = np.hstack([track_q[:3], pin.Quaternion(R).coeffs(), q])
+
+        # Calculates v (track velocity) and a (track accel)
+        theta, mu, phi = track_q[3:6]
+        theta_dot, mu_dot, phi_dot = track_v[3:6]
+
+        # Precompute because we like efficiency
+        c_mu = np.cos(mu)
+        s_mu = np.sin(mu)
+        s_theta = np.sin(theta)
+        c_theta = np.cos(theta)
+
+        # Rotation Jacobians
+        J_e = np.array([[0, -s_theta, c_theta * c_mu], [0, c_theta, s_theta * c_mu], [1, 0, -s_mu]])
+        J_e_dot = np.array(
+            [
+                [0, -theta_dot * c_theta, -theta_dot * s_theta * c_mu - mu_dot * c_theta * s_mu],
+                [0, -theta_dot * s_theta, theta_dot * c_theta * c_mu - mu_dot * s_theta * s_mu],
+                [0, 0, -mu_dot * c_mu],
+            ]
+        )
+
+        # Compute ω and concatenate with spacial velocities and given joint velocities
+        # Rotate from world to body
+        body_linear_v = R.T @ track_v[:3]
+        body_angular_v = R.T @ J_e @ track_v[3:6]
+
+        v = np.hstack([body_linear_v, body_angular_v, q_dot])
+
+        # Compute dω and concatentate with accelerations and given joint accelerations
+        # Rotate from world to body
+        a = np.hstack(
+            [
+                R.T @ track_a[:3] - np.cross(body_angular_v, body_linear_v),
+                R.T @ (J_e @ track_a[3:6] + J_e_dot @ track_v[3:6]),
+                q_ddot,
+            ]
         )
 
         torques = cpin.rnea(self.model, self.data, q, v, a, f_ext)
@@ -285,10 +353,23 @@ class Vehicle:
             self.data.f[3].angular[1],
         )
 
-    def set_constraints(self, q, dq, ddq, z, v_3):
+    def set_constraints(self, q_1, q_1_dot, q_1_ddot, q, dq, ddq, f_z, u, v_3):
         v_3x, v_3y, v_3z = ca.vertsplit(v_3)
 
-        torques, (f_3z, m_3x, m_3y) = self.rnea(q, dq, ddq)
+        q_dot = dq * q_1_dot
+        q_ddot = ddq * q_1_dot**2 + dq * q_1_ddot
+
+        f_ext = [cpin.Force.Zero() for _ in range(self.model.njoints)]
+        
+        f_3x, f_3y, m_3z = ca.vertsplit(self.w3e_func(f_z, u, v_3))
+        f_xa, f_za, m_ya = ca.vertsplit(self.w6_func(f_z, u, v_3))
+
+        # TODO Check these indicies
+        f_ext[3] = cpin.Force(np.array([f_3x, f3_y, 0]), np.array([0, 0, m_3z]))
+        f_ext[6] = cpin.Force(np.array([f_xa, 0, f_za]), np.array([0, m_ya, 0]))
+        
+
+        torques, (f_3z, m_3x, m_3y) = self.rnea(q_1, q_1_dot, q_1_ddot, q, q_dot, d_ddot, f_ext)
 
         for i in range(3):
             self.opti.subject_to(torques[i] == 0)
