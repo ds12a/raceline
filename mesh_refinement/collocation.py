@@ -43,6 +43,9 @@ class PSCollocation(Collocation):
     Assumes usage of CasADi.
     """
 
+    def __init__(self):
+        self.opti = ca.Opti()
+
     @staticmethod
     def generate_D(tau: np.ndarray) -> np.ndarray:
         """

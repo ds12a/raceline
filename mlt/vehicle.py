@@ -28,6 +28,7 @@ class VehicleProperties:
     g_t: list  # Track widths [front, rear]
     g_S: float  # Frontal area
     g_hq1: list  # Roll centers [front, rear] (guess)
+    g_steer_max = 0.179008128  # Max steering angle
 
     # Aero properties
     a_Cx: 0.8581  # Drag coeff
@@ -39,12 +40,18 @@ class VehicleProperties:
 
     # Tire
     t_rw: list  # Tire radius [front, rear]
+    t_Dx1: list
+    t_Dx2: list
     t_Dy1: list
     t_Dy2: list
     t_Cy: list
     t_sypeak: list
     t_Fznom: list
     t_Ey: list
+
+    # Engine
+    e_max = 341_000  # Max engine power
+
     # Setup
     p_kb: 0.5  # Brake Bias
     p_karb: list  # ARB stiffness [front, rear]
@@ -223,7 +230,8 @@ class Vehicle:
                 for i in range(2)
             ]
         )
-        f_y = ca.Function("f_y", [f_z, u, v_3], [f_y_out])(f_z, u, v_3)
+        self.f_y_func = ca.Function("f_y", [f_z, u, v_3], [f_y_out])
+        f_y = self.f_y_func(f_z, u, v_3)
 
         # Defining longitudinal force f_ijx
         f_x_out = ca.vertcat(
@@ -370,7 +378,10 @@ class Vehicle:
             + track_v_spacial * self.track.length * q_1_ddot
         )
 
-        R = self.track.se3_state(q_1 * self.track.length).rotation
+        se3 = self.track.se3_state(q_1 * self.track.length)
+
+        R = se3.rotation
+        q = np.hstack([cpin.utils.SE3ToXYZQUAT(se3), q])
 
         J_e, J_e_dot = self.track.rotation_jacobians(q_1 * self.track.length)
 
@@ -404,10 +415,16 @@ class Vehicle:
             ),
         )
 
-    def set_constraints(self, q_1, q_1_dot, q_1_ddot, q, dq, ddq, f_z, u):
+    def set_constraints(self, q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u):
 
-        q_dot = dq * q_1_dot
-        q_ddot = ddq * q_1_dot**2 + dq * q_1_ddot
+        cpin.forwardKinematics(
+            self.model,
+            self.data,
+            ca.vertcat([cpin.utils.SE3ToXYZQUAT(self.track.se3_state(q_1 * self.track.length)), q]),
+            ca.vertcat([q_1_dot, q_dot]),
+        )
+
+        v_3 = self.data.v[self.road_lat_id][:3]
 
         f_ext = [cpin.Force.Zero() for _ in range(self.model.njoints)]
 
@@ -418,7 +435,9 @@ class Vehicle:
         f_ext[3] = cpin.Force(np.array([f_3x, f_3y, 0]), np.array([0, 0, m_3z]))
         f_ext[6] = cpin.Force(np.array([f_xa, 0, f_za]), np.array([0, m_ya, 0]))
 
-        torques, v3, (f_3z, m_3x, m_3y) = self.rnea(q_1, q_1_dot, q_1_ddot, q, q_dot, q_ddot, f_ext)
+        torques, v_3, (f_3z, m_3x, m_3y) = self.rnea(
+            q_1, q_1_dot, q_1_ddot, q, q_dot, q_ddot, f_ext
+        )
         v_3x, v_3y, v_3z = ca.vertsplit(v_3)
 
         self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_za, f_3z, m_3x, m_3y, m_ya) == f_z)
@@ -441,6 +460,40 @@ class Vehicle:
             torques[5]
             == -self.prop.p_phi(self.prop.s_k) * q[4] - self.prop.p_phi(self.prop.s_c) * q_dot[4]
         )
+
+        # Power limit
+        self.opti.subject_to(u[0] * v_3x <= self.prop.e_max)
+
+        # Control bounds
+        self.opti.subject_to(self.opti.bounded(0, u[0], 1))
+        self.opti.subject_to(self.opti.bounded(0, u[1], 1))
+        self.opti.subject_to(self.opti.bounded(-self.prop.g_steer_max, u[2], self.prop.g_steer_max))
+
+        # Track bounds
+        n_l, n_r = self.track.state(np.array([q_1 * self.track.length]))[-2:]
+        self.opti.subject_to(self.opti.bounded(-n_r, q[0], n_l))
+
+        f_x = ca.vertcat(
+            ca.horzcat(*(2 * [u[1] * self.prop.p_kb / 2])),
+            ca.horzcat(*(2 * [u[1] * (1 - self.prop.p_kb) + u[0]])) / 2,
+        )
+        f_y = self.f_y_func(f_z, u, v_3)
+
+        for i in range(2):
+            for j in range(2):
+                mu_x = (
+                    self.prop.t_Dx1
+                    + self.prop.t_Dx2 * (f_z[i, j] - self.prop.t_Fznom) / self.prop.t_Fznom
+                )
+                mu_y = (
+                    self.prop.t_Dy1
+                    + self.prop.t_Dy2 * (f_z[i, j] - self.prop.t_Fznom) / self.prop.t_Fznom
+                )
+
+                self.opti.subject_to(
+                    (f_x[i, j] / (mu_x * f_z[i, j])) ** 2 + (f_y[i, j] / (mu_y * f_z[i, j])) ** 2
+                    <= 1
+                )
 
 
 if __name__ == "__main__":
