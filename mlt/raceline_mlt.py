@@ -84,7 +84,7 @@ class MLTCollocation(PSCollocation):
 
             # Collocation constraints (enforces dynamics on X)
             for k in range(0, N[k] + 1):
-                q_1 = 
+                q_1 = ca.vertcat
 
 
             # Quadrature enforcement
