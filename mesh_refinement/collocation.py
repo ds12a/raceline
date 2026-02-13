@@ -1,8 +1,7 @@
-from typing import Protocol
 import numpy as np
 
 
-class Collocation(Protocol):
+class Collocation:
     """
     Interface that defines expected behavior for specific collocation problems passed into mesh refinement.
     """
@@ -21,7 +20,7 @@ class Collocation(Protocol):
             object: Final configuration deemed optimal by the collocation iteration
         """
 
-        raise NotImplementedError("笨蛋，你这么还没有写这个东西啊！")
+        raise NotImplementedError()
 
     def sample_cost(self, target: object, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
@@ -34,4 +33,5 @@ class Collocation(Protocol):
         Returns:
             tuple[np.ndarray, float]: Individual errors and total quadrature
         """
-        raise NotImplementedError("笨蛋，你这么还没有写这个东西啊！")
+        raise NotImplementedError()
+

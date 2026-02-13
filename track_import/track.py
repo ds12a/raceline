@@ -2,6 +2,7 @@ import numpy as np
 import scipy.interpolate
 import plotly.graph_objects as go
 import json
+import pinocchio as pin
 
 
 class Track:
@@ -70,6 +71,60 @@ class Track:
         return np.asarray(
             [self.poly[interval](parameter) for parameter, interval in zip(tau, k)]
         )
+    
+    def se3_state(self, s:float) -> pin.SE3:
+        """
+        Generates the SE3 pose of the track centerline at arc length s
+
+        Args:
+            s (float): arc length parameterization
+
+        Returns:
+            pin.SE3: Generated SE3
+        """        
+        q = self.state(s)
+        rot = pin.rpy.rpyToMatrix(q[3:6][::-1])
+
+        return pin.SE3(rot, q[:3])
+
+
+    def rotation_jacobians(self, s: float) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Calculates rotation Jacobians for angular velocity and acceleration wrt to arc length
+
+        Args:
+            s (float): Arc length parameter
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Angular velocity and acceleration Jacobian matricies respectively
+        """        
+        # Compute rotation matrix from body to world
+        state = self.state(np.array([s]))[0]
+        state_ds = self.state(np.array([s]), der=1)[0]
+        
+        R = pin.rpy.rpyToMatrix(*state[3:6][::-1])  # We store in zyx (yaw, pitch, roll)
+
+        # Calculates v (track velocity) and a (track accel)
+        theta, mu, phi = state[3:6]
+        theta_ds, mu_ds, phi_ds = state_ds[3:6]
+
+        # Precompute because we like efficiency
+        c_mu = np.cos(mu)
+        s_mu = np.sin(mu)
+        s_theta = np.sin(theta)
+        c_theta = np.cos(theta)
+
+        # Rotation Jacobians
+        J_e = np.array([[0, -s_theta, c_theta * c_mu], [0, c_theta, s_theta * c_mu], [1, 0, -s_mu]])
+        J_e_dot = np.array(
+            [
+                [0, -theta_ds * c_theta, -theta_ds * s_theta * c_mu - mu_ds * c_theta * s_mu],
+                [0, -theta_ds * s_theta, theta_ds * c_theta * c_mu - mu_ds * s_theta * s_mu],
+                [0, 0, -mu_ds * c_mu],
+            ]
+        )
+
+        return J_e, J_e_dot
 
     def der_state(self, s: np.ndarray, n=1) -> np.ndarray:
         """
