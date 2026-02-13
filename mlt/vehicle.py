@@ -465,8 +465,8 @@ class Vehicle:
         self.opti.subject_to(u[0] * v_3x <= self.prop.e_max)
 
         # Control bounds
-        self.opti.subject_to(self.opti.bounded(0, u[0], 1))
-        self.opti.subject_to(self.opti.bounded(0, u[1], 1))
+        self.opti.subject_to(u[0] >= 0)
+        self.opti.subject_to(u[1] >= 0)
         self.opti.subject_to(self.opti.bounded(-self.prop.g_steer_max, u[2], self.prop.g_steer_max))
 
         # Track bounds
