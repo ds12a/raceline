@@ -3,11 +3,10 @@ import numpy as np
 from track_import.track import Track
 from typing import override
 from vehicle import Vehicle
-from mesh_refinement.collocation import Collocation
-from mesh_refinement.psutil import generate_D
+from mesh_refinement.collocation import PSCollocation
 import casadi as ca
 
-class MLTCollocation(Collocation):
+class MLTCollocation(PSCollocation):
 
     n_q: int = 5
     n_u: int = 3
@@ -23,10 +22,12 @@ class MLTCollocation(Collocation):
     def iteration(self, t: np.ndarray, N: np.ndarray):
         K = len(N)
 
+        Q_1_dot = []
+
         # Q, dQ, ddQ are (N_k + 2) x (n_q).
         Q = []  # Array containing Q matrices. q_j = [theta, mu, phi, n_l, n_r].
-        dQ = []  # Array containing dQ (1st der) matrices.
-        ddQ = []  # Array containing ddQ (2nd der) matrices.
+        Q_dot = []
+        Q_ddot = []
 
         U = []
         Z = []
@@ -40,35 +41,41 @@ class MLTCollocation(Collocation):
 
         # Constraints for each segment k
         for k in range(K):
+            
+            # Generation of LG collocation points
+            tau, w = np.polynomial.legendre.leggauss(N[k])  # w is the quadrature weights
+            tau = np.asarray([-1] + list(tau) + [1])
+            D = PSCollocation.generate_D(tau)  # Differentiation matrix
+
 
             # Useful values for conversion between t and tau
             norm_factor = (t[k + 1] - t[k]) / 2
             t_tau_0 = (t[k + 1] + t[k]) / 2  # Global time t at tau = 0
+            t_tau = norm_factor * tau + t_tau_0  # Global time (t) at collocation points
 
-            # Legendre Gauss collocation points tau with appended -1 and 1
-            # w is the quadrature weights
-            tau, w = np.polynomial.legendre.leggauss(N[k])
-            tau = np.asarray([-1] + list(tau) + [1])
 
-            # Global time (t) at collocation points
-            t_tau = norm_factor * tau + t_tau_0
-
-            # Differentiation matrix
-            D = generate_D(tau)
-
-            # Generates X and Q matrices + derivatives for this segment
+            # Generates Q, matrices + derivatives for this segment
             if k == 0:
-                Q.append(opti.variable(N[k] + 2, n_q))
-                X.append(opti.variable(N[k] + 2, n_x))
+                Q.append(self.opti.variable(N[k] + 2, self.n_q))
+                U.append(self.opti.variable(N[k] + 2, self.n_u))
+                Z.append(self.opti.variable(N[k] + 2, self.n_z))
+                Q_1_dot.append(self.opti.variable())
             else:
                 # Explicitly couples last of previous segment with first of current segment
                 # by setting them as the same variable
-                Q.append(vertcat(Q[k - 1][-1, :], opti.variable(N[k] + 1, n_q)))
-                X.append(vertcat(X[k - 1][-1, :], opti.variable(N[k] + 1, n_x)))
+                Q.append(ca.vertcat(Q[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
+                Q.append(ca.vertcat(U[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_u)))
+                Q.append(ca.vertcat(Z[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_z)))
+                Q_1_dot.append(self.opti.variable())
 
-            dQ.append((2 / (t[k + 1] - t[k])) * mtimes(D, Q[k]))
-            ddQ.append(2 / (t[k + 1] - t[k]) * mtimes(D, dQ[k]))
-            dX.append((2 / (t[k + 1] - t[k])) * mtimes(D, X[k]))
+
+            # Time derivative calculation
+            dQ = (2 / (t[k + 1] - t[k])) * ca.mtimes(D, Q[k])
+            ddQ = (2 / (t[k + 1] - t[k])) * ca.mtimes(D, dQ)
+            Q_1_ddot = (2 / (t[k + 1] - t[k])) * ca.mtimes(D, Q_1_dot[k]) * Q_1_dot[k]
+            Q_dot.append(dQ * Q_1_dot[k])
+            Q_ddot.append(ddQ * Q_1_dot[k] ** 2 + dQ * Q_1_ddot)
+
 
             # Continuity constraints
             if k != 0:
@@ -76,13 +83,9 @@ class MLTCollocation(Collocation):
                 opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
 
             # Collocation constraints (enforces dynamics on X)
-            theta = Q[k][:-1, 0]
-            mu = Q[k][:-1, 1]
+            for k in range(0, N[k] + 1):
+                q_1 = 
 
-            opti.subject_to(dX[k][:-1, 0] == cos(theta) * cos(mu))
-            opti.subject_to(dX[k][:-1, 1] == sin(theta) * cos(mu))
-            opti.subject_to(dX[k][:-1, 2] == -sin(mu))
-            opti.subject_to(opti.bounded(-pi / 2 + 1e-3, mu, pi / 2 - 1e-3))
 
             # Quadrature enforcement
             for j in range(N[k]):
