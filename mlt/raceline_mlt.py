@@ -12,7 +12,7 @@ class MLTCollocation(PSCollocation):
     n_u: int = 3
     n_z: int = 4
 
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.opti = ca.Opti()
         self.config = config
         self.track = Track.load(config["track"])
@@ -32,8 +32,6 @@ class MLTCollocation(PSCollocation):
         U = []
         Z = []
 
-        
-
         J = 0  # Cost accumulator
 
         # If there is no warm start, this is a utility variable for initial guessing
@@ -41,18 +39,15 @@ class MLTCollocation(PSCollocation):
 
         # Constraints for each segment k
         for k in range(K):
-            
             # Generation of LG collocation points
             tau, w = np.polynomial.legendre.leggauss(N[k])  # w is the quadrature weights
             tau = np.asarray([-1] + list(tau) + [1])
             D = PSCollocation.generate_D(tau)  # Differentiation matrix
 
-
             # Useful values for conversion between t and tau
             norm_factor = (t[k + 1] - t[k]) / 2
             t_tau_0 = (t[k + 1] + t[k]) / 2  # Global time t at tau = 0
             t_tau = norm_factor * tau + t_tau_0  # Global time (t) at collocation points
-
 
             # Generates Q, matrices + derivatives for this segment
             if k == 0:

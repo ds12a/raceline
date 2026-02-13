@@ -23,7 +23,7 @@ class PacejkaModel:
             )
         )
 
-
+                    
 class AWSIMPacejka(PacejkaModel):
     """
     An extension of the Pacejka class that specifically uses the AWSIM simplified Pacejka model

@@ -286,7 +286,7 @@ class Vehicle:
             [(f_3z - f_za) * ca.vertcat(*[(l - self.prop.g_a[i]) / (2 * l) for i in range(2)])],
         )
 
-        # Aero downforce
+        # Aero downforce is passed in
 
         # Longitudinal shift
         delta_f_z = ca.Function("delta_f_z", [m_3y], [-(m_3y - m_ya) / (2 * l)])
@@ -393,14 +393,18 @@ class Vehicle:
 
         torques = cpin.rnea(self.model, self.data, q, v, a, f_ext)
 
-        return torques, (
-            self.data.f[3].linear[3],
-            self.data.f[3].angular[0],
-            self.data.f[3].angular[1],
+        # TODO check these indicies!
+        return (
+            torques,
+            self.data.v[3],
+            (
+                self.data.f[3].linear[3],
+                self.data.f[3].angular[0],
+                self.data.f[3].angular[1],
+            ),
         )
 
-    def set_constraints(self, q_1, q_1_dot, q_1_ddot, q, dq, ddq, f_z, u, v_3):
-        v_3x, v_3y, v_3z = ca.vertsplit(v_3)
+    def set_constraints(self, q_1, q_1_dot, q_1_ddot, q, dq, ddq, f_z, u):
 
         q_dot = dq * q_1_dot
         q_ddot = ddq * q_1_dot**2 + dq * q_1_ddot
@@ -414,7 +418,8 @@ class Vehicle:
         f_ext[3] = cpin.Force(np.array([f_3x, f_3y, 0]), np.array([0, 0, m_3z]))
         f_ext[6] = cpin.Force(np.array([f_xa, 0, f_za]), np.array([0, m_ya, 0]))
 
-        torques, (f_3z, m_3x, m_3y) = self.rnea(q_1, q_1_dot, q_1_ddot, q, q_dot, q_ddot, f_ext)
+        torques, v3, (f_3z, m_3x, m_3y) = self.rnea(q_1, q_1_dot, q_1_ddot, q, q_dot, q_ddot, f_ext)
+        v_3x, v_3y, v_3z = ca.vertsplit(v_3)
 
         self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_za, f_3z, m_3x, m_3y, m_ya) == f_z)
 
