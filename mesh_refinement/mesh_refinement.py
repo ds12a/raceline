@@ -51,7 +51,7 @@ class MeshRefinement:
                 best_iter = i + 1
                 best_cost = new_cost
 
-        track.ccw = ccw  # TODO what is this
+        track.ccw = ccw
 
         print(f"Fitting finished. Chose iteration {best_iter} with cost evaluation {best_cost}.")
         return best_eval

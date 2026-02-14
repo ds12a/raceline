@@ -56,7 +56,7 @@ class VehicleProperties:
     p_kb: 0.5  # Brake Bias
     p_karb: list  # ARB stiffness [front, rear]
 
-    @staticmethodo
+    @staticmethod
     def load_yaml(config):
         with open(config, "r") as f:
             all_things = yaml.safe_load(f)
@@ -242,12 +242,12 @@ class Vehicle:
         f_x = ca.Function("f_x", [u], [f_x_out])(u)
 
         # Defines expressions X1, X2, Y1, Y2
-        self.X1_func = ca.Function(
+        X1 = ca.Function(
             "X1",
             [f_z, u, v_3],
             [(f_x[0, 0] + f_x[0, 1]) * ca.cos(delta) - (f_y[0, 0] + f_y[0, 1]) * ca.sin(delta)],
-        )
-        self.X2_func = ca.Function("X2", [f_z, u, v_3], [f_x[1, 0] + f_x[1, 1]])
+        )(f_z, u, v_3)
+        X2 = ca.Function("X2", [f_z, u, v_3], [f_x[1, 0] + f_x[1, 1]])(f_z, u, v_3)
         self.Y1_func = ca.Function(
             "Y1",
             [f_z, u, v_3],
@@ -255,11 +255,10 @@ class Vehicle:
         )
         self.Y2_func = ca.Function("Y2", [f_z, u, v_3], [f_y[1, 0] + f_y[1, 1]])
 
-        # Define W3e
-        X1 = self.X1_func(f_z, u, v_3)
-        X2 = self.X2_func(f_z, u, v_3)
         Y1 = self.Y1_func(f_z, u, v_3)
         Y2 = self.Y2_func(f_z, u, v_3)
+
+        # Define W3e
         w3e = ca.vertcat(X1 + X2, Y1 + Y2, Y1 * self.prop.g_a[0] - Y2 * self.prop.g_a[1])
         self.w3e_func = ca.Function("W3e", [f_z, u, v_3], [w3e])
 
@@ -271,7 +270,7 @@ class Vehicle:
         v_3 = ca.SX.sym("v_3", 6)  # Twist vector (frame 3)
         f_z = ca.SX.sym("f_z", 2, 2)  # z forces on each wheel
 
-        f_za = ca.SX.sym("f_za")  # Aerodynamic downforce
+        f_za = ca.SX.sym("f_za", 2)  # Aerodynamic downforce
 
         # RNEA outputs for W_3J
         f_3z = ca.SX.sym("f_3z")  # Downforce
@@ -289,57 +288,48 @@ class Vehicle:
 
         # Static load
         l = sum(self.prop.g_a)
+        f_z0_out = [
+            (f_3z - f_za) * ca.vertcat(*[(l - self.prop.g_a[i]) / (2 * l) for i in range(2)])
+        ]
         f_z0 = ca.Function(
             "f_zi0",
             [v_3, f_za, f_3z],
-            [(f_3z - f_za) * ca.vertcat(*[(l - self.prop.g_a[i]) / (2 * l) for i in range(2)])],
-        )
+            f_z0_out,
+        )(v_3, f_za, f_3z)
 
-        # Aero downforce is passed in
+        # Aero downforce is passed in FIXME FIXME this is wrong! TODO CALCULATE FRONT AND REAR DOWNFORCES SEPARATELY FIXME!
 
         # Longitudinal shift
         delta_f_z = ca.Function("delta_f_z", [m_3y], [-(m_3y - m_ya) / (2 * l)])
 
         # Lateral shift
-        Y = [self.Y1_func(f_z, u, v_3), self.Y2_func(f_z, u, v_3)]
-        k_phi = [self.prop.p_phi_1(self.prop.s_k), self.prop.p_phi_2(self.prop.s_k)]
-        lateral_delta_f_z_out = [
-            ca.vertcat(
-                *[
-                    (k_phi[i] / sum(k_phi) * (-m_3x - sum(Y)) + self.prop.g_hq1[i] * Y[i])
-                    / self.prop.t[i]
-                    for i in range(2)
-                ]
-            )
-        ]
 
+        # ==================================== Lateral load transfer ====================================
+        Y = [self.Y1_func(f_z, u, v_3), self.Y2_func(f_z, u, v_3)]  # Lateral force on axles
+        k_phi = [self.prop.p_phi_1(self.prop.s_k), self.prop.p_phi_2(self.prop.s_k)]  # Roll stiff  # TODO precalculate
+
+        lateral_delta_f_z_out = [
+            (k_phi[i] / sum(k_phi) * (-m_3x - sum(Y)) + self.prop.g_hq1[i] * Y[i]) / self.prop.t[i]
+            for i in range(2)
+        ]
         lateral_delta_f_z = ca.Function(
             "lateral_delta_f_z", [f_z, u, v_3, m_3x], lateral_delta_f_z_out
         )(f_z, u, v_3, m_3x)
 
-        f_z0_out = f_z0(v_3, f_za, f_3z)
-        lateral_delta_f_z_out = lateral_delta_f_z(f_z, u, v_3, m_3x)
-
-        self.f_z_func = ca.Function(
-            "f_z",
-            [f_z, u, v_3, f_za, f_3z, m_3x, m_3y, m_ya],
+        # ========================= Calculate f_z (All vertical forces on tires) =========================
+        f_z_out = ca.SX(
             [
-                ca.vertcat(
-                    *[
-                        ca.horzcat(
-                            *[
-                                f_z0_out[i]
-                                + f_za
-                                + delta_f_z(m_3y)
-                                + (-1) ** j * lateral_delta_f_z_out[i]
-                                for j in range(2)
-                            ]
-                        )
-                        for i in range(2)
-                    ]
-                )
-            ],
+                [
+                    f_z0[i]
+                    + f_za[i]
+                    + delta_f_z(m_3y)
+                    + (-1) ** j * lateral_delta_f_z[i]  # TODO fix fza
+                    for j in range(2)
+                ]
+                for i in range(2)
+            ]
         )
+        self.f_z_func = ca.Function("f_z", [f_z, u, v_3, f_za, f_3z, m_3x, m_3y, m_ya], f_z_out)
 
     def rnea(
         self,
@@ -417,7 +407,6 @@ class Vehicle:
         )
 
     def set_constraints(self, q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u):
-
         cpin.forwardKinematics(
             self.model,
             self.data,

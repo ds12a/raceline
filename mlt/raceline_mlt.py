@@ -5,19 +5,19 @@ from typing import override
 from vehicle import Vehicle
 from mesh_refinement.collocation import PSCollocation
 import casadi as ca
+from mesh_refinement.mesh_refinement import MeshRefinement
+import yaml
 
 
 class MLTCollocation(PSCollocation):
-
     n_q: int = 5
     n_u: int = 3
     n_z: int = 4
 
-    def __init__(self, config: dict):
+    def __init__(self, vehicle_properties_path: str, track_path: str):
         super().__init__()
-        self.config = config
-        self.track = Track.load(config["track"])
-        self.vehicle = Vehicle(config["vehicle_properties"], self.track, self.opti)
+        self.track = Track.load(track_path)
+        self.vehicle = Vehicle(vehicle_properties_path, self.track, self.opti)
 
     @override
     def iteration(self, t: np.ndarray, N: np.ndarray):
@@ -90,3 +90,8 @@ class MLTCollocation(PSCollocation):
     @staticmethod
     def cost(q_1_dot, u, prev_u, k_delta=1e-4, k_f=1e-4):
         return 1 / q_1_dot + k_delta * (u[2] - prev_u[2]) + k_f * (u[0] * u[1])
+
+
+with open(, "r") as file:
+    config_data = yaml.safe_load(file)
+MeshRefinement(MLTCollocation())
