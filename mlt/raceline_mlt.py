@@ -5,6 +5,8 @@ from track_import.track import Track
 from mlt.vehicle import Vehicle
 from mesh_refinement.collocation import PSCollocation
 import casadi as ca
+from mlt.trajectory import Trajectory
+import plotly.graph_objects as go
 
 
 class MLTCollocation(PSCollocation):
@@ -17,7 +19,6 @@ class MLTCollocation(PSCollocation):
         super().__init__()
         self.config = config
         self.track = Track.load(config["track"])
-        
 
     def iteration(self, t: np.ndarray, N: np.ndarray):
         self.opti = ca.Opti()
@@ -96,14 +97,18 @@ class MLTCollocation(PSCollocation):
 
             # Quadrature enforcement
             for j in range(N[k]):
-                lagrange_term = MLTCollocation.cost(Q_1_dot[k][j + 1, :], U[k][j + 1, :], U[k][j, :])
+                lagrange_term = MLTCollocation.cost(
+                    Q_1_dot[k][j + 1, :], U[k][j + 1, :], U[k][j, :]
+                )
                 J += norm_factor * w[j] * lagrange_term
 
             # Initial guess
             self.opti.set_initial(Q_1_dot[k], 1 / self.track.length)
 
             # self.opti.set_initial(Q[k])
-            self.opti.set_initial(Z[k], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4)
+            self.opti.set_initial(
+                Z[k], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
+            )
             self.opti.set_initial(U[k][0], 100)
 
         self.opti.minimize(J)
@@ -114,7 +119,7 @@ class MLTCollocation(PSCollocation):
             "ipopt.sb": "no",
             # "ipopt.max_iter": 1000,
             "detect_simple_bounds": True,
-            "ipopt.linear_solver": "ma97"
+            "ipopt.linear_solver": "ma97",
             # "ipopt.mu_strategy": "adaptive",
             # "ipopt.nlp_scaling_method": "gradient-based",
             # "ipopt.bound_relax_factor": 0,
@@ -146,9 +151,24 @@ class MLTCollocation(PSCollocation):
 
         print(f"Final cost: {sol.value(J)}")
 
+        U_sol = [sol.value(seg) for seg in U]
+        Q_sol = [sol.value(seg) for seg in Q]
+        v_sol = [sol.value(seg) for seg in Q_1_dot]
+
+        ttt = Trajectory(Q_sol, U_sol, v_sol, t, self.track.length)
+
+        x = ttt.plot_collocation()
+        xx = ttt.plot_uniform()
+
+        fig = go.Figure()
+
+        fig.add_traces([x, xx])
+        fig.update_layout(scene=dict(aspectmode="data"))
+        fig.show()
+
     @staticmethod
     def cost(q_1_dot, u, prev_u, k_delta=1e-4, k_f=1e-4):
-        return 1 / q_1_dot + k_f * (u[0] * u[1]) # + k_delta * (u[2] - prev_u[2]) 
+        return 1 / q_1_dot + k_f * (u[0] * u[1])  # + k_delta * (u[2] - prev_u[2])
 
 
 config = {

@@ -278,6 +278,38 @@ class Track:
         b_r = x + n * n_r[:, np.newaxis]
 
         return b_l, b_r
+    
+    def raceline(self, state: np.ndarray) -> tuple[float, float]:
+        """
+        Computes track boundaries
+
+        Args:
+            state (np.ndarray): Array of states at each point
+                                [[x, y, z, theta, mu, phi, n_l, n_r], ...]
+
+        Returns:
+            tuple: Tuple of left and right boundaries (b_l, b_r)
+        """
+        # State is in the form [[x, y, z, theta, mu, phi, n_l, n_r], ...]
+        x = state[:, :3]
+        theta = state[:, 3]
+        mu = state[:, 4]
+        phi = state[:, 5]
+        n_l = state[:, 6]
+        n_r = state[:, 7]
+
+        n = np.column_stack(
+            [
+                np.cos(theta) * np.sin(mu) * np.sin(phi) - np.sin(theta) * np.cos(phi),
+                np.sin(theta) * np.sin(mu) * np.sin(phi) + np.cos(theta) * np.cos(phi),
+                np.cos(mu) * np.sin(phi),
+            ]
+        )
+
+        b_l = x + n * n_l[:, np.newaxis]
+        b_r = x + n * n_r[:, np.newaxis]
+
+        return b_l, b_r
 
     def tau_to_t(self, tau: float | np.ndarray, k: float | np.ndarray) -> float | np.ndarray:
         """
