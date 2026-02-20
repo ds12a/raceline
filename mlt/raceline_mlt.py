@@ -42,8 +42,8 @@ class MLTCollocation(PSCollocation):
 
         J = 0  # Cost accumulator
 
-        # If there is no warm start, this is a utility variable for initial guessing
-        last_theta_guess = None
+
+        all_t = []
 
         # Constraints for each segment k
         for k in range(K):
@@ -51,15 +51,21 @@ class MLTCollocation(PSCollocation):
             if k == 0:
                 Q.append(self.opti.variable(N[k] + 2, self.n_q))
                 Q_1_dot.append(self.opti.variable(N[k] + 2, 1))
+
+                U.append(self.opti.variable(N[k] + 2, self.n_u))
+                Z.append(self.opti.variable(N[k] + 2, self.n_z))
             else:
                 # Explicitly couples last of previous segment with first of current segment
                 # by setting them as the same variable
                 Q.append(ca.vertcat(Q[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
                 Q_1_dot.append(ca.vertcat(Q_1_dot[k - 1][-1, :], self.opti.variable(N[k] + 1, 1)))
 
+                U.append(ca.vertcat(U[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_u)))
+                Z.append(ca.vertcat(Z[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_z)))
+
             # Generates discontinous CasADi variables at collocation points
-            U.append(self.opti.variable(N[k] + 2, self.n_u))
-            Z.append(self.opti.variable(N[k] + 2, self.n_z))
+            # U.append(self.opti.variable(N[k] + 2, self.n_u))
+            # Z.append(self.opti.variable(N[k] + 2, self.n_z))
 
             # Generation of LG collocation points
             tau, w = np.polynomial.legendre.leggauss(N[k])  # w is the quadrature weights
@@ -82,10 +88,13 @@ class MLTCollocation(PSCollocation):
             # Continuity constraints
             if k != 0:
                 self.opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
-                self.opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
+                # self.opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
+
+            all_t.append(t_tau[0])
 
             # Collocation constraints (enforces dynamics on X)
             for i, q_1 in enumerate(t_tau[1:-1]):
+                all_t.append(q_1)
                 self.vehicle.set_constraints(
                     q_1,
                     Q_1_dot[k][i + 1, :],
@@ -97,22 +106,30 @@ class MLTCollocation(PSCollocation):
                     U[k][i + 1, :],
                 )
 
-            # Quadrature enforcement
+            # Quadrature cost
             for j in range(N[k]):
                 lagrange_term = MLTCollocation.cost(
                     Q_1_dot[k][j + 1, :], U[k][j + 1, :], U[k][j, :]
                 )
                 J += norm_factor * w[j] * lagrange_term
 
+            
+
             # Initial guess
-            self.opti.set_initial(Q_1_dot[k], 1 / self.track.length)
-            self.opti.set_initial(Z[k], ca.DM([[self.vehicle.prop.m_sprung * 9.81] * 4] * (N[k] + 2)))
+            self.opti.set_initial(Q_1_dot[k][:, :], 30 / self.track.length)
+            # self.opti.set_initial(Z[k], ca.DM([[self.vehicle.prop.m_sprung * 9.81] * 4] * (N[k] + 2)))
 
             # self.opti.set_initial(Q[k])
             self.opti.set_initial(
-                Z[k], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
+                Z[k][:, :], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
             )
-            self.opti.set_initial(U[k][0], 100)
+            # self.opti.set_initial(U[k][:, 0], 500)
+
+        # Periodicity
+        self.opti.subject_to(Q[-1][-1, :] == Q[0][0, :])
+        self.opti.subject_to(Z[-1][-1, :] == Z[0][0, :])
+        self.opti.subject_to(U[-1][-1, :] == U[0][0, :])
+        self.opti.subject_to(Q_dot[-1][-1, :] == Q_dot[0][0, :])
 
         self.opti.minimize(J)
 
@@ -120,7 +137,7 @@ class MLTCollocation(PSCollocation):
             # "ipopt.print_frequency_iter": 50,
             "print_time": 0,
             "ipopt.sb": "no",
-            "ipopt.max_iter": 1000,
+            "ipopt.max_iter": 0,
             "detect_simple_bounds": True,
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
@@ -159,18 +176,18 @@ class MLTCollocation(PSCollocation):
         v_sol = [sol.value(seg) for seg in Q_1_dot]
 
         ttt = Trajectory(Q_sol, U_sol, v_sol, t, self.track.length)
+        fine_plot, _ = self.track.plot_uniform(1)
 
-        x = ttt.plot_collocation()
+        x = ttt.plot_colloc()
         xx = ttt.plot_uniform()
 
         fig = go.Figure()
+        for i in fine_plot:
+            fig.add_trace(i)
 
-        fig.add_traces([x, xx])
-        # fig.update_layout(scene=dict(aspectmode="data"))
+        fig.add_traces([x, self.track.plot_raceline_uniform(ttt), self.track.plot_raceline_colloc(all_t, ttt)])
+        fig.update_layout(scene=dict(aspectmode="data"))
         fig.show()
-
-        self.track.plot_raceline(ttt)
-
     @staticmethod
     def cost(q_1_dot, u, prev_u, k_delta=1e-4, k_f=1e-4):
         return 1 / q_1_dot + k_f * (u[0] * u[1])  # + k_delta * (u[2] - prev_u[2])
@@ -199,4 +216,4 @@ r_config = {
 # mr.run()
 
 foo = MLTCollocation(config)
-foo.iteration(np.linspace(0, 1, 100), np.array([4] * 99))
+foo.iteration(np.linspace(0, 1, 20), np.array([10] * 19))

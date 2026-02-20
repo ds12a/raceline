@@ -113,10 +113,25 @@ class Trajectory:
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         points = self(s)
 
-        px.scatter(x=s, y=points[:, 0]).show()
-        px.scatter(x=s, y=points[:, 1]).show()
-        px.scatter(x=s, y=points[:, 2]).show()
-        
+        f1 = go.Figure()
+        f2 = go.Figure()
+        f3 = go.Figure()
+
+        p1, p2, p3 = self.plot_colloc()
+
+        f1.add_trace(p1)
+        f2.add_trace(p2)
+        f3.add_trace(p3)
+
+
+        f1.add_trace(px.scatter(x=s, y=points[:, 0]))
+        f2.add_trace(px.scatter(x=s, y=points[:, 1]))
+        f3.add_trace(px.scatter(x=s, y=points[:, 2]))
+
+        f1.show()
+        f2.show()
+        f3.show()
+
         return go.Scatter3d(
             x=points[:, 0],
             y=points[:, 1],
@@ -125,6 +140,38 @@ class Trajectory:
             mode="lines",
             line=dict(color=self.v, colorscale="plasma"),
         )
+
+    def plot_colloc(self):
+        """
+        Makes Plotly GraphObjects for centerline, left/right boundaries of track, and
+        theta, mu, and phi at uniformly sampled points along the track
+
+        Args:
+            approx_spacing (float): Distance between sampled points
+
+        Returns:
+            tuple: Tuple of list of GraphObjects for centerline + left/right boundaries
+                and GraphObject for theta/mu/phi
+        """
+        s = self.t
+
+        # Sample uniformly according to the given spacing
+        points = self(s)
+
+
+        return (
+            px.scatter(x=s, y=points[:, 0], title="fxa"),
+            px.scatter(x=s, y=points[:, 1], title="fxb"),
+            px.scatter(x=s, y=points[:, 2], title="delta"),
+        )
+        # return go.Scatter3d(
+        #     x=points[:, 0],
+        #     y=points[:, 1],
+        #     z=points[:, 2],
+        #     name="u fxa fxb delta",
+        #     mode="lines",
+        #     line=dict(color=self.v, colorscale="plasma"),
+        # )
 
     def tau_to_t(self, tau: float | np.ndarray, k: float | np.ndarray) -> float | np.ndarray:
         """

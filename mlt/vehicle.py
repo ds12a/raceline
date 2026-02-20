@@ -490,7 +490,7 @@ class Vehicle:
         )
 
         # Positive velocity
-        self.opti.subject_to(q_1_dot > 0)
+        self.opti.subject_to(q_1_dot > 3 / self.track.length)
 
         # Power limit
         self.opti.subject_to(u[0] * v_3x <= self.prop.e_max)

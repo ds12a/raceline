@@ -280,39 +280,45 @@ class Track:
 
         return b_l, b_r
 
-    def plot_raceline(self, trajectory: Trajectory, approx_spacing=0.1):
+    def plot_raceline_uniform(self, trajectory: Trajectory, approx_spacing=0.1):
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         ss = trajectory.state(s)
-        r = self.raceline(self.state(s), ss[:, 0])
+        r = self.raceline(self.state(s), ss[:, 3])
 
-        fig = go.Figure()
+        return go.Scatter3d(
+            x=r[:, 0],
+            y=r[:, 1],
+            z=r[:, 2],
+            name="line",
+            mode="lines",
+            line=dict(color=ss[:, -1] * self.length, colorscale="plasma", showscale=True),
+        )
+    
+    def plot_raceline_colloc(self, all_t, trajectory: Trajectory):
+        print(trajectory.v)
+        all_t = np.array(all_t)
+        r = self.raceline(self.state(self.length * all_t), trajectory.state(all_t * self.length)[:, 3])
 
-        fig.add_trace(
-            go.Scatter3d(
-                x=r[:, 0],
-                y=r[:, 1],
-                z=r[:, 2],
-                name="line",
-                mode="lines",
-                line=dict(color=ss[:, -1], colorscale="Viridis"),
-            )
+        return go.Scatter3d(
+            x=r[:, 0],
+            y=r[:, 1],
+            z=r[:, 2],
+            name="colloc",
+            mode="markers",
+            marker=dict(color=trajectory.v, colorscale="plasma"),
         )
 
-        fig.show()
 
-        fig.update_layout(scene=dict(aspectmode="data"))
-        fig.show()
-
-    def raceline(self, state: np.ndarray, n_l) -> tuple[float, float]:
+    def raceline(self, state: np.ndarray, lateral_displacement: float) -> np.ndarray:
         """
-        Computes track boundaries
+        Computes raceline
 
         Args:
             state (np.ndarray): Array of states at each point
                                 [[x, y, z, theta, mu, phi, n_l, n_r], ...]
 
+
         Returns:
-            tuple: Tuple of left and right boundaries (b_l, b_r)
         """
         # State is in the form [[x, y, z, theta, mu, phi, n_l, n_r], ...]
         x = state[:, :3]
@@ -328,9 +334,9 @@ class Track:
             ]
         )
 
-        b_l = x + n * n_l[:, np.newaxis]
+        rl = x + n * lateral_displacement[:, np.newaxis]
 
-        return b_l
+        return rl
 
     def tau_to_t(self, tau: float | np.ndarray, k: float | np.ndarray) -> float | np.ndarray:
         """
