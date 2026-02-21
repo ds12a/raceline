@@ -66,7 +66,7 @@ class Track:
                         for each given arc length parameter
         """
         s = s % self.length
-        k = np.searchsorted(self.t[1:], s)
+        # k = np.searchsorted(self.t[1:], s)
 
         tau, k = self.t_to_tau(s)
         return np.asarray([self.poly[interval](parameter) for parameter, interval in zip(tau, k)])
@@ -136,12 +136,12 @@ class Track:
                         [x, y, z, theta, mu, phi, n_l, n_r] for each given arc length parameter
         """
         s = s % self.length
-        k = np.searchsorted(self.t[1:], s)
+        # k = np.searchsorted(self.t[1:], s)
 
         tau, k = self.t_to_tau(s)
         return np.asarray(
             [
-                self.poly[interval].derivative(parameter, der=n)
+                self.poly[interval].derivative(parameter, der=n) * (2.0 / (self.t[interval+1] - self.t[interval])) ** n
                 for parameter, interval in zip(tau, k)
             ]
         )
@@ -293,11 +293,12 @@ class Track:
             mode="lines",
             line=dict(color=ss[:, -1] * self.length, colorscale="plasma", showscale=True),
         )
-    
+
     def plot_raceline_colloc(self, all_t, trajectory: Trajectory):
-        print(trajectory.v)
         all_t = np.array(all_t)
-        r = self.raceline(self.state(self.length * all_t), trajectory.state(all_t * self.length)[:, 3])
+        r = self.raceline(
+            self.state(self.length * all_t), trajectory.state(all_t * self.length)[:, 3]
+        )
 
         return go.Scatter3d(
             x=r[:, 0],
@@ -307,7 +308,6 @@ class Track:
             mode="markers",
             marker=dict(color=trajectory.v, colorscale="plasma"),
         )
-
 
     def raceline(self, state: np.ndarray, lateral_displacement: float) -> np.ndarray:
         """

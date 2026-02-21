@@ -137,7 +137,7 @@ class MLTCollocation(PSCollocation):
             # "ipopt.print_frequency_iter": 50,
             "print_time": 0,
             "ipopt.sb": "no",
-            "ipopt.max_iter": 0,
+            "ipopt.max_iter": 1000,
             "detect_simple_bounds": True,
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
@@ -176,16 +176,16 @@ class MLTCollocation(PSCollocation):
         v_sol = [sol.value(seg) for seg in Q_1_dot]
 
         ttt = Trajectory(Q_sol, U_sol, v_sol, t, self.track.length)
-        fine_plot, _ = self.track.plot_uniform(1)
+        fine_plot, _ = self.track.plot_uniform( 1)
 
-        x = ttt.plot_colloc()
-        xx = ttt.plot_uniform()
+        # x = ttt.plot_colloc()
+        xx = ttt.plot_uniform(np.array(all_t) * self.track.length)
 
         fig = go.Figure()
         for i in fine_plot:
             fig.add_trace(i)
 
-        fig.add_traces([x, self.track.plot_raceline_uniform(ttt), self.track.plot_raceline_colloc(all_t, ttt)])
+        fig.add_traces([xx, self.track.plot_raceline_uniform(ttt), self.track.plot_raceline_colloc(all_t, ttt)])
         fig.update_layout(scene=dict(aspectmode="data"))
         fig.show()
     @staticmethod

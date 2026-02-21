@@ -20,12 +20,13 @@ class Trajectory:
         Args:
 
             Q (list[np.ndarray]): List of matricies representing q in each interval
-            X (list[np.ndarray]): List of matricies representing x in each interval
+            U (list[np.ndarray]): List of matricies representing u in each interval
+            v (list): List containing velocities at each mesh and collocation point
             t (np.ndarray): List of arc length parameters representing the beginning
                             of each interval
         """
-        self.Q = Q  # q
-        self.v = v
+        self.Q = Q  # q2,...
+        self.v = np.array(v) * track_length
         self.U = U  # fxa fxb delta
         self.t = t * track_length
         self.length = track_length
@@ -42,7 +43,7 @@ class Trajectory:
             tau = np.asarray([-1] + list(tau) + [1])
 
             self.poly.append(
-                scipy.interpolate.BarycentricInterpolator(tau, np.column_stack([U[k], Q[k], v[k]]))
+                scipy.interpolate.BarycentricInterpolator(tau, np.column_stack([U[k], Q[k], self.v[k]]))
             )
 
     def __call__(self, s: np.ndarray) -> np.ndarray:
@@ -96,19 +97,7 @@ class Trajectory:
             line=dict(color=self.v, colorscale="plasma"),
         )
 
-    def plot_uniform(self, approx_spacing: float = 0.1):
-        """
-        Makes Plotly GraphObjects for centerline, left/right boundaries of track, and
-        theta, mu, and phi at uniformly sampled points along the track
-
-        Args:
-            approx_spacing (float): Distance between sampled points
-
-        Returns:
-            tuple: Tuple of list of GraphObjects for centerline + left/right boundaries
-                   and GraphObject for theta/mu/phi
-        """
-
+    def plot_uniform(self, t, approx_spacing: float = 0.1):
         # Sample uniformly according to the given spacing
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         points = self(s)
@@ -116,21 +105,25 @@ class Trajectory:
         f1 = go.Figure()
         f2 = go.Figure()
         f3 = go.Figure()
+        f4 = go.Figure()
 
-        p1, p2, p3 = self.plot_colloc()
+        p1, p2, p3, p4 = self.plot_colloc(t)
 
         f1.add_trace(p1)
         f2.add_trace(p2)
         f3.add_trace(p3)
+        f4.add_trace(p4)
 
 
-        f1.add_trace(px.scatter(x=s, y=points[:, 0]))
-        f2.add_trace(px.scatter(x=s, y=points[:, 1]))
-        f3.add_trace(px.scatter(x=s, y=points[:, 2]))
+        f1.add_trace(go.Scatter(x=s, y=points[:, 0], name="uniform fxa"))
+        f2.add_trace(go.Scatter(x=s, y=points[:, 1], name="uniform fxb"))
+        f3.add_trace(go.Scatter(x=s, y=points[:, 2], name="uniform delta"))
+        f4.add_trace(go.Scatter(x=s, y=points[:, -1], name="uniform vel"))
 
         f1.show()
         f2.show()
         f3.show()
+        f4.show()
 
         return go.Scatter3d(
             x=points[:, 0],
@@ -141,28 +134,16 @@ class Trajectory:
             line=dict(color=self.v, colorscale="plasma"),
         )
 
-    def plot_colloc(self):
-        """
-        Makes Plotly GraphObjects for centerline, left/right boundaries of track, and
-        theta, mu, and phi at uniformly sampled points along the track
-
-        Args:
-            approx_spacing (float): Distance between sampled points
-
-        Returns:
-            tuple: Tuple of list of GraphObjects for centerline + left/right boundaries
-                and GraphObject for theta/mu/phi
-        """
-        s = self.t
-
+    def plot_colloc(self, s):
         # Sample uniformly according to the given spacing
         points = self(s)
 
 
         return (
-            px.scatter(x=s, y=points[:, 0], title="fxa"),
-            px.scatter(x=s, y=points[:, 1], title="fxb"),
-            px.scatter(x=s, y=points[:, 2], title="delta"),
+            go.Scatter(x=s, y=points[:, 0], name="fxa",mode='markers',),
+            go.Scatter(x=s, y=points[:, 1], name="fxb",mode='markers',),
+            go.Scatter(x=s, y=points[:, 2], name="delta",mode='markers',),
+            go.Scatter(x=s, y=points[:, -1], name="vel",mode='markers',),
         )
         # return go.Scatter3d(
         #     x=points[:, 0],
