@@ -156,7 +156,7 @@ class Track:
         e_angles = state[:, 3:6]
         rots = R.from_euler("ZYX", e_angles).as_matrix()
 
-        return (*[rots[:, :, i] for i in range(3)],)
+        return [rots[:, :, i] for i in range(3)]
 
     # TODO refactor stuff that uses this to use tnb (it is cleaner, this yucky)
     def normal(self, state):

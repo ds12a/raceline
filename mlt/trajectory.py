@@ -89,26 +89,6 @@ class Trajectory:
 
 
     # david why this exist it looked balls on track fitting too
-    # def plot_collocation(self):
-    #     """
-    #     Makes Plotly GraphObject for controls at the collocation points
-
-    #     Returns:
-    #         go.Scatter3d: Controls at collocation points
-    #     """
-
-    #     # Make a real array, not some dumb list
-    #     u = np.concatenate(self.U)
-
-    #     return go.Scatter3d(
-    #         x=u[:, 0],
-    #         y=u[:, 1],
-    #         z=u[:, 2],
-    #         name="c fxa, fxb, delta",
-    #         mode="lines",
-    #         line=dict(color=self.v, colorscale="plasma"),
-    #     )
-
     # why not
     def plot_collocation(self, approx_spacing: float = 0.1, plot_uniform = False, plot_q = False):
         self.plot_params(self.colloc_t, approx_spacing, plot_uniform, plot_q)
@@ -122,7 +102,6 @@ class Trajectory:
             uniform = self(s)
 
         # Uniform and plot q toggle so less pollution
-
         collocation = np.hstack(
             [
                 np.concatenate(self.U),
@@ -150,7 +129,6 @@ class Trajectory:
         figs = []
 
         for i, p in enumerate(params):
-
             if not plot_q and "q" in p:
                 continue
 
@@ -168,18 +146,6 @@ class Trajectory:
 
         for f in figs:
             f.show()
-
-        # return go.Scatter3d(
-        #     x=uniform[:, 0],
-        #     y=uniform[:, 1],
-        #     z=uniform[:, 2],
-        #     name="u fxa fxb delta",
-        #     mode="lines",
-        #     # line=dict(color=self.v, colorscale="plasma"),
-        # )
-
-
-
 
     def tau_to_t(self, tau: float | np.ndarray, k: float | np.ndarray) -> float | np.ndarray:
         """
