@@ -35,8 +35,9 @@ class Trajectory:
         self.Z = Z
         self.v = np.array(v) * track_length
         self.U = U  # fxa fxb delta
-        self.t = t * track_length
+        self.t = t * track_length       # q1
         self.length = track_length
+        self.colloc_t = []              # all collocation times
 
         # List of the interpolated polynomial over each interval
         # [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
@@ -47,12 +48,14 @@ class Trajectory:
             N_k = len(Q[k]) - 2
             tau, _ = np.polynomial.legendre.leggauss(N_k)
             tau = np.asarray([-1] + list(tau) + [1])
+            self.colloc_t.extend(self.tau_to_t(tau[:-1], k))       # misses last element but thats probably fine
 
             self.poly.append(
                 scipy.interpolate.BarycentricInterpolator(
                     tau, np.column_stack([U[k], Q[k], self.Z[k], self.v[k]])
                 )
             )
+        self.colloc_t = np.array(self.colloc_t)
 
     def __call__(self, s: np.ndarray) -> np.ndarray:
         """
@@ -82,31 +85,43 @@ class Trajectory:
 
         tau, k = self.t_to_tau(s)
         return np.asarray([self.poly[interval](parameter) for parameter, interval in zip(tau, k)])
+    
 
-    def plot_collocation(self):
-        """
-        Makes Plotly GraphObject for controls at the collocation points
 
-        Returns:
-            go.Scatter3d: Controls at collocation points
-        """
+    # david why this exist it looked balls on track fitting too
+    # def plot_collocation(self):
+    #     """
+    #     Makes Plotly GraphObject for controls at the collocation points
 
-        # Make a real array, not some dumb list
-        u = np.concatenate(self.U)
+    #     Returns:
+    #         go.Scatter3d: Controls at collocation points
+    #     """
 
-        return go.Scatter3d(
-            x=u[:, 0],
-            y=u[:, 1],
-            z=u[:, 2],
-            name="c fxa, fxb, delta",
-            mode="lines",
-            line=dict(color=self.v, colorscale="plasma"),
-        )
+    #     # Make a real array, not some dumb list
+    #     u = np.concatenate(self.U)
 
-    def plot_params(self, t, approx_spacing: float = 0.1):
+    #     return go.Scatter3d(
+    #         x=u[:, 0],
+    #         y=u[:, 1],
+    #         z=u[:, 2],
+    #         name="c fxa, fxb, delta",
+    #         mode="lines",
+    #         line=dict(color=self.v, colorscale="plasma"),
+    #     )
+
+    # why not
+    def plot_collocation(self, approx_spacing: float = 0.1, plot_uniform = False, plot_q = False):
+        self.plot_params(self.colloc_t, approx_spacing, plot_uniform, plot_q)
+
+
+    def plot_params(self, t, approx_spacing: float = 0.1, plot_uniform = False, plot_q = False):
         # Sample uniformly according to the given spacing
-        s = np.linspace(0, self.length, int(self.length // approx_spacing))
-        uniform = self(s)
+
+        if plot_uniform:
+            s = np.linspace(0, self.length, int(self.length // approx_spacing))
+            uniform = self(s)
+
+        # Uniform and plot q toggle so less pollution
 
         collocation = np.hstack(
             [
@@ -117,7 +132,7 @@ class Trajectory:
             ]
         )
 
-        params = [
+        params = [  # surely better way to do this right
             "fxa",
             "fxb",
             "delta",
@@ -135,10 +150,18 @@ class Trajectory:
         figs = []
 
         for i, p in enumerate(params):
-            if "fz" not in p or p == "fz11":
+
+            if not plot_q and "q" in p:
+                continue
+
+            # Exceptions for tire forces and accel + braking 
+            # david i think braking and accel should go together
+            if p != "fxb" and ("fz" not in p or p == "fz11"):
                 figs.append(go.Figure())
 
-            figs[-1].add_trace(go.Scatter(x=s, y=uniform[:, i], name=f"uniform {p}"))
+            if plot_uniform:
+                figs[-1].add_trace(go.Scatter(x=s, y=uniform[:, i], name=f"uniform {p}"))
+
             figs[-1].add_trace(
                 go.Scatter(x=t, y=collocation[:, i], name=f"colloc {p}", mode="markers")
             )
@@ -146,14 +169,17 @@ class Trajectory:
         for f in figs:
             f.show()
 
-        return go.Scatter3d(
-            x=uniform[:, 0],
-            y=uniform[:, 1],
-            z=uniform[:, 2],
-            name="u fxa fxb delta",
-            mode="lines",
-            # line=dict(color=self.v, colorscale="plasma"),
-        )
+        # return go.Scatter3d(
+        #     x=uniform[:, 0],
+        #     y=uniform[:, 1],
+        #     z=uniform[:, 2],
+        #     name="u fxa fxb delta",
+        #     mode="lines",
+        #     # line=dict(color=self.v, colorscale="plasma"),
+        # )
+
+
+
 
     def tau_to_t(self, tau: float | np.ndarray, k: float | np.ndarray) -> float | np.ndarray:
         """

@@ -41,6 +41,7 @@ t_Ey: [0, 0]
 # Engine
 e_max: 341_000 # Max engine power (W)
 
-# Setup
+# Setup / misc
+bound_tol: 0.25 # tolerance for trajectory proximity to track bound (wheelbase-based)
 p_kb: 0.5 # Brake Bias
 p_karb: [0, 0] # ARB stiffness [front, rear] was 436593, 0

@@ -54,6 +54,7 @@ class VehicleProperties:
     e_max: float  # Max engine power
 
     # Setup
+    bound_tol: float
     p_kb: float  # Brake Bias
     p_karb: list  # ARB stiffness [front, rear]
 
@@ -415,7 +416,10 @@ class Vehicle:
         # Rotate from world to body
         a = ca.vertcat(
             R.T @ track_a[:3] - ca.cross(body_angular_v, body_linear_v),
-            R.T @ (J_e @ track_a[3:6] + J_e_dot @ track_v[3:6] * q_1_dot * self.track.length),      # TODO i think the chain rule is fixed
+            R.T
+            @ (
+                J_e @ track_a[3:6] + J_e_dot @ track_v[3:6] * q_1_dot * self.track.length
+            ),  # TODO i think the chain rule is fixed
             q_ddot,
         )
 
@@ -466,7 +470,7 @@ class Vehicle:
         self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) == f_z)
 
         # J_e, _ = self.track.rotation_jacobians(q_1 * self.track.length)
-        self.opti.subject_to(ff_torque == 0)       # TODO check math here and see if necessary
+        self.opti.subject_to(ff_torque == 0)  # TODO check math here and see if necessary
 
         self.opti.subject_to(torques[6] == 0)  # road_lat
         self.opti.subject_to(torques[7] == 0)  # yaw
@@ -503,7 +507,13 @@ class Vehicle:
 
         # Track bounds
         n_l, n_r = self.track.state(np.array([q_1 * self.track.length]))[0][-2:]
-        self.opti.subject_to(self.opti.bounded(n_r, q[0], n_l))
+        self.opti.subject_to(
+            self.opti.bounded(
+                n_r + max(self.prop.g_t) / 2 + self.prop.bound_tol,
+                q[0],
+                n_l - max(self.prop.g_t) / 2 - self.prop.bound_tol,
+            )
+        )
 
         f_x = ca.vertcat(
             ca.horzcat(*(2 * [-u[1] * self.prop.p_kb / 2])),

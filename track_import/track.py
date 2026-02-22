@@ -1,11 +1,13 @@
 import numpy as np
 import scipy.interpolate
+from scipy.spatial.transform import Rotation as R
 import plotly.graph_objects as go
 import json
 import pinocchio as pin
 import pinocchio.casadi as cpin
 import casadi as ca
 from mlt.trajectory import Trajectory
+# from mlt.vehicle import Vehicle, VehicleProperties
 
 
 class Track:
@@ -82,7 +84,7 @@ class Track:
             pin.SE3: Generated SE3
         """
         q = self.state(np.array([s]))[0]
-        rot = cpin.rpy.rpyToMatrix(*q[3:6][::-1])
+        rot = cpin.rpy.rpyToMatrix(q[5], q[4], q[3])
 
         return cpin.SE3(rot, ca.SX(q[:3]))
 
@@ -146,7 +148,17 @@ class Track:
                 for parameter, interval in zip(tau, k)
             ]
         )
-    
+
+    def tnb(self, s):
+        state = self.state(s)
+
+        # Euler (zyx)
+        e_angles = state[:, 3:6]
+        rots = R.from_euler("ZYX", e_angles).as_matrix()
+
+        return (*[rots[:, :, i] for i in range(3)],)
+
+    # TODO refactor stuff that uses this to use tnb (it is cleaner, this yucky)
     def normal(self, state):
         # State is in the form [[x, y, z, theta, mu, phi, n_l, n_r], ...]
         theta = state[:, 3]
@@ -280,8 +292,8 @@ class Track:
             y=np.array([points[:, 1], points[:, 4]]),
             z=np.array([points[:, 2], points[:, 5]]),
             opacity=0.9,
-            colorscale=[[0,"#848484"],[1,'#D3D3D3']],
-            showscale=False
+            colorscale=[[0, "#D3D3D3"], [1, "#D3D3D3"]],
+            showscale=False,
         )
 
     def plot_collocation(self):
@@ -418,7 +430,65 @@ class Track:
             ),
         )
 
-    def plot_raceline_colloc(self, all_t: np.ndarray, trajectory: Trajectory) -> go.Scatter3d:
+
+    # TODO probably pass in track width directly, cannot import vehicle because circular
+    def plot_car_bounds(self, trajectory: Trajectory, g_t, approx_spacing=0.1):
+        s = np.linspace(0, self.length, int(self.length // approx_spacing))
+        ss = trajectory.state(s)
+        heading_angle = ss[:, 4]
+
+        r = self.raceline(self.state(s), ss[:, 3])
+        t, _, b = self.tnb(s)
+
+        # print(t[0], b[0])
+
+        # calculation of heading vec for car
+        heading_trans = R.from_rotvec(b * heading_angle[:, np.newaxis])
+        h_v = heading_trans.apply(t)
+
+        # calculation of normal vec for car
+        n_v = np.cross(b, h_v)
+        n_v = n_v / np.linalg.norm(n_v, axis=1, keepdims=True)  # normalize just in case
+
+        print(n_v[0])
+        width = max(g_t) / 2
+
+        r += np.array([0, 0, 0.1])
+        l_track = r + n_v * width
+        r_track = r - n_v * width
+
+        plots = []
+        for track in (l_track, r_track):
+            plots.append(
+                go.Scatter3d(
+                    x=track[:, 0],
+                    y=track[:, 1],
+                    z=track[:, 2],
+                    name="line",
+                    mode="lines",
+                    line=dict(
+                        color="black",
+                        width=4,
+                    ),
+                )
+            )
+
+        surface = go.Surface(
+            x=np.array([l_track[:, 0], r_track[:, 0]]),
+            y=np.array([l_track[:, 1], r_track[:, 1]]),
+            z=np.array([l_track[:, 2], r_track[:, 2]]),
+            opacity=1,  # TODO fix its broken
+            surfacecolor=ss[:, -1],
+            colorscale="Viridis",
+            cmin=trajectory.v.min(),
+            cmax=trajectory.v.max(),
+        )
+
+        # TODO fix surface, its a bit broken
+        return (*plots,)
+
+    # its plotting colloc anyways might as well just use new class var
+    def plot_raceline_colloc(self, trajectory: Trajectory) -> go.Scatter3d:
         """
         Makes Ploty graph object for MLT raceline given trajectory object.
         Plots collocation and mesh points.
@@ -431,7 +501,8 @@ class Track:
             go.Scatter3d: Raceline trajectory graph
         """
         r = self.raceline(
-            self.state(self.length * all_t), trajectory.state(all_t * self.length)[:, 3]
+            self.state(self.length * trajectory.colloc_t),
+            trajectory.state(trajectory.colloc_t * self.length)[:, 3],
         )
 
         return go.Scatter3d(
