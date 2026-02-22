@@ -38,10 +38,12 @@ class Trajectory:
         self.t = t * track_length       # q1
         self.length = track_length
         self.colloc_t = []              # all collocation times
+        foo = []
 
         # List of the interpolated polynomial over each interval
         # [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
         self.poly = []
+        allt = []
 
         for k in range(len(Q)):
             # Number of collocation points
@@ -49,6 +51,7 @@ class Trajectory:
             tau, _ = np.polynomial.legendre.leggauss(N_k)
             tau = np.asarray([-1] + list(tau) + [1])
             self.colloc_t.extend(self.tau_to_t(tau[:-1], k))       # misses last element but thats probably fine
+            foo.extend(self.tau_to_t(tau, k))
 
             self.poly.append(
                 scipy.interpolate.BarycentricInterpolator(
@@ -56,6 +59,9 @@ class Trajectory:
                 )
             )
         self.colloc_t = np.array(self.colloc_t)
+        flattened_all = np.vstack([np.column_stack([U[k], Q[k], self.Z[k], self.v[k]]) for k in range(len(Q))])
+        print(np.array(foo).flatten().shape, flattened_all.shape)
+        self.linfit = scipy.interpolate.interp1d(np.array(foo).flatten(), flattened_all, axis=0)
 
     def __call__(self, s: np.ndarray) -> np.ndarray:
         """
@@ -68,6 +74,10 @@ class Trajectory:
             np.ndarray: Array whose columns are [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
         """
         return self.state(s)
+
+    def linstate(self, s:np.ndarray) -> np.ndarray:
+        s = s % self.length
+        return self.linfit(s)
 
     def state(self, s: np.ndarray) -> np.ndarray:
         """

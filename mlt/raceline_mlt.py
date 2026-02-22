@@ -4,6 +4,7 @@ import numpy as np
 from track_import.track import Track
 from mlt.vehicle import Vehicle, VehicleProperties
 from mesh_refinement.collocation import PSCollocation
+from mesh_refinement.mesh_refinement import MeshRefinement
 import casadi as ca
 from mlt.trajectory import Trajectory
 import plotly.graph_objects as go
@@ -20,6 +21,8 @@ class MLTCollocation(PSCollocation):
         super().__init__()
         self.config = config
         self.track = Track.load(config["track"])
+        self.start_t = 0
+        self.end_t = 1
 
     def iteration(self, t: np.ndarray, N: np.ndarray):
         self.opti = ca.Opti()
@@ -112,10 +115,24 @@ class MLTCollocation(PSCollocation):
             v_guess = 10
             self.opti.set_initial(Q_1_dot[k][:, :], v_guess / self.track.length)
 
+
             # Vertical tire forces
-            self.opti.set_initial(
-                Z[k][:, :], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
-            )
+            # print(Z[k])
+            for i in range(2):
+                downforce = self.vehicle.env.rho / 2 * self.vehicle.prop.g_S * v_guess ** 2 * self.vehicle.prop.a_Cz[i]
+                for j in range(2):
+                    self.opti.set_initial(
+                        Z[k][:, 2 * i + j], ((self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4 + downforce / 2)
+                    )
+            #         print("foo")
+            #         print((self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4)
+            #         print(downforce)
+            #         print((self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4 + downforce)
+
+            # self.opti.set_initial(
+            #     Z[k][:, :], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
+            # )
+
 
             # q4
             self.opti.set_initial(
@@ -141,22 +158,13 @@ class MLTCollocation(PSCollocation):
             # wheelbase = sum(self.vehicle.prop.g_a)
             # delta_guess = np.atan(wheelbase * curvature)
             # self.opti.set_initial(U[k][:, 2], delta_guess)
-            # TODO check this
+
             s_points = t_tau * self.track.length
             wheelbase = sum(self.vehicle.prop.g_a)
-            ds = 1.0    # finite differencing probably switch to exact later
+            kyaw = self.track.der_state(s_points, n=1)[:, 3]
+            delta_guess = np.atan(wheelbase * kyaw)
 
-            delta_guess = np.zeros(len(t_tau))
-            for idx, s_val in enumerate(s_points):
-                s_num = float(s_val)
-                R = np.array(ca.DM(self.track.se3_state(s_num).rotation))
-                R_next = np.array(ca.DM(self.track.se3_state(s_num + ds).rotation))
-                
-                Omega_hat = R.T @ (R_next - R) / ds
-                kappa_yaw = Omega_hat[1, 0]
-                delta_guess[idx] = np.arctan(wheelbase * kappa_yaw)
-
-            self.opti.set_initial(U[k][:, 2], delta_guess)
+            # self.opti.set_initial(U[k][:, 2], delta_guess)
 
         # Periodicity
         self.opti.subject_to(Q[-1][-1, :] == Q[0][0, :])
@@ -220,6 +228,38 @@ class MLTCollocation(PSCollocation):
     @staticmethod
     def cost(q_1_dot, u, prev_u, k_delta=1e-5, k_f=1e-3):
         return 1 / q_1_dot + k_f * (u[0] * u[1]) + k_delta * ca.sqrt((u[2] - prev_u[2])**2 + 1e-8)
+    
+    def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
+        """
+        Samples costs at the given points and computes their trapezoidal quadrature
+
+        Args:
+            points (np.ndarray): Sample points
+            target (object): Configuration object for this class/problem
+
+        Returns:
+            tuple[np.ndarray, float]: Individual errors and total quadrature
+        """
+
+        # Measures runge phenomena at a point
+        
+        state = traj(points * traj.length)
+        linstate = traj.linstate(points * traj.length)
+
+        # print(state, linstate)
+
+        v_poly = state[:, -1]
+        v_lin = linstate[:, -1]
+
+        fz_poly = state[:, -2]   # just measure one wheel
+        fz_lin = linstate[:, -2]
+
+        v_defect = ((v_poly - v_lin) / (np.abs(v_lin) + 1e-5)) ** 2
+        fz_defect = ((fz_poly - fz_lin) / (np.abs(fz_lin) + 1e-5)) ** 2
+
+        # print(v_defect, fz_defect)
+
+        return v_defect + fz_defect, np.trapezoid((v_defect + fz_defect), x=points)
 
 
 if __name__ == "__main__":
@@ -230,29 +270,29 @@ if __name__ == "__main__":
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
-        "initial_collocation": 8,  # Number of collocation points per segment initially
-        "initial_mesh_points": 15,  # Number of mesh points initially
-        "refinement_steps": 8,  # Number of refinement steps to perform
+        "initial_collocation": 3,  # Number of collocation points per segment initially
+        "initial_mesh_points": 20,  # Number of mesh points initially
+        "refinement_steps": 2,  # Number of refinement steps to perform
         # Lower level parameters relating to the mesh refinement process
         "config": {
-            "sampling_resolution": 0.5,  # Cost function sampling resolution
-            "variation_threshold": 0.5,  # Threshold of variation to choose between h and p refinement
+            "sampling_resolution": 1e-3,  # Cost function sampling resolution
+            "variation_threshold": 0.2,  # Threshold of variation to choose between h and p refinement
             "h_divisions": 2,  # Number of mesh points added when h-refining a segment
-            "h_min_collocation": 4,  # Number of initial collocation points per new segment
-            "p_degree_increase": 5,  # Degree added when p-refining a segment
+            "h_min_collocation": 3,  # Number of initial collocation points per new segment
+            "p_degree_increase": 3,  # Degree added when p-refining a segment
         },
     }
 
-    # mr = MeshRefinement(MLTCollocation(config), r_config)
+    mr = MeshRefinement(MLTCollocation(config), r_config)
 
-    # mr.run()
+    traj = mr.run()
 
     foo = MLTCollocation(config)
-    foo.iteration(np.linspace(0, 1, 120), np.array([5] * 119)).save("mlt/generated/testing.json")
+    # foo.iteration(np.linspace(0, 1, 100), np.array([3] * 99)).save("mlt/generated/testing.json")
 
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
-    traj = Trajectory.load("mlt/generated/testing.json")
+    # traj = Trajectory.load("mlt/generated/testing.json")
 
     # Visualize
     fine_plot, _ = foo.track.plot_uniform(1)

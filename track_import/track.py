@@ -467,22 +467,26 @@ class Track:
                     name="line",
                     mode="lines",
                     line=dict(
-                        color="black",
-                        width=4,
+                        color=ss[:, -1],
+                        colorscale="jet",
+                        showscale=True,
+                        cmin=trajectory.v.min(),
+                        cmax=trajectory.v.max(),
+                        width=6,
                     ),
                 )
             )
 
-        surface = go.Surface(
-            x=np.array([l_track[:, 0], r_track[:, 0]]),
-            y=np.array([l_track[:, 1], r_track[:, 1]]),
-            z=np.array([l_track[:, 2], r_track[:, 2]]),
-            opacity=1,  # TODO fix its broken
-            surfacecolor=ss[:, -1],
-            colorscale="Viridis",
-            cmin=trajectory.v.min(),
-            cmax=trajectory.v.max(),
-        )
+        # surface = go.Surface(
+        #     x=np.array([l_track[:, 0], r_track[:, 0]]),
+        #     y=np.array([l_track[:, 1], r_track[:, 1]]),
+        #     z=np.array([l_track[:, 2], r_track[:, 2]]),
+        #     opacity=1,  # TODO fix its broken
+        #     surfacecolor=ss[:, -1],
+        #     colorscale="Viridis",
+        #     cmin=trajectory.v.min(),
+        #     cmax=trajectory.v.max(),
+        # )
 
         # TODO fix surface, its a bit broken
         return (*plots,)
@@ -500,16 +504,22 @@ class Track:
         Returns:
             go.Scatter3d: Raceline trajectory graph
         """
+        print("len", len(trajectory.colloc_t))
         r = self.raceline(
             self.state(self.length * trajectory.colloc_t),
             trajectory.state(trajectory.colloc_t * self.length)[:, 3],
         )
+        print("len2", len(r))
+        print(r)
+        print(len(r[:, 0]))
+        print(len(r[:, 1]))
+        print(len(r[:, 2]))
 
         return go.Scatter3d(
-            x=r[:, 0],
-            y=r[:, 1],
-            z=r[:, 2],
+            x=r[:, 0].flatten(),
+            y=r[:, 1].flatten(),
+            z=r[:, 2].flatten(),
             name="colloc",
             mode="markers",
-            # marker=dict(color=trajectory.v, colorscale="plasma"),
+            marker=dict(size=5),
         )

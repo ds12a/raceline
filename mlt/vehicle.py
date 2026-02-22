@@ -429,7 +429,7 @@ class Vehicle:
         torques = cpin.rnea(self.cmodel, self.cdata, q, v, a, f_ext)
 
         v_1 = ca.vertcat(body_linear_v, body_angular_v)
-        ff_torque = ca.dot(v_1, torques[:6])
+        ff_torque = ca.dot(v_1, torques[:6]) * q_1_dot      # TODO test with q_1_dot factor and without, i am not sure it improves convergence
 
         # TODO check these indicies!
         # print(self.cdata.f[3].linear.size())
