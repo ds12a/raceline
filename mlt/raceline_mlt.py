@@ -341,8 +341,8 @@ if __name__ == "__main__":
 
     # traj = mr.run()
 
-    foo = MLTCollocation(config)
-    foo.iteration(np.linspace(0, 1, 60), np.array([3] * 59)).save("mlt/generated/testing.json")
+    mlt = MLTCollocation(config)
+    mlt.iteration(np.linspace(0, 1, 60), np.array([3] * 59)).save("mlt/generated/testing.json")
 
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")

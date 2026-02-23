@@ -362,11 +362,6 @@ class Vehicle:
             tuple[np.ndarray, tuple[float, float, float]]: Torques (τ1, ..., τ6) and structural wrench components (f3z, m3x, m3y)
         """
 
-        # q = ca.SX.sym("q", 12)
-        # v = ca.SX.sym("v", 11)
-        # a = ca.SX.sym("a", 11)
-        # f_ext = [].  q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u
-
         # Dummy variable definitions
         q = ca.SX.sym("q", 12)
         v = ca.SX.sym("v", 11)
@@ -394,7 +389,6 @@ class Vehicle:
         ff_torque = ca.dot(v[:6], torques[:6])
 
         # TODO check these indicies!
-        # print(self.cdata.f[3].linear.size())
         self.rnea_func = ca.Function(
             "rnea",
             [q, v, a, f_z, u],
@@ -495,7 +489,6 @@ class Vehicle:
                 )
 
     def calculate_freeflyer_config(self, q_1):
-
         q_1_dot = ca.SX.sym("q_1_dot")
         q_1_ddot = ca.SX.sym("q_1_ddot")
 
