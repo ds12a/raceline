@@ -118,7 +118,7 @@ class Vehicle:
         self._init_w3_func()
         self._init_w6_func()
         self._init_fz_func()
-
+        self._init_rnea_func()
 
     @staticmethod
     def _2d_list_to_SX(l: list):
@@ -225,6 +225,7 @@ class Vehicle:
         f_xa, f_xb, delta = ca.vertsplit(u)
         v_3x, v_3y, _, _, _, omega_3z = ca.vertsplit(v_3)
 
+        v_3x = ca.fmax(v_3x, 0.1)
         # Wheel slip (alpha)
         alpha_out = ca.vertcat(
             delta - (v_3y + omega_3z * self.prop.g_a[0]) / v_3x,
@@ -344,7 +345,7 @@ class Vehicle:
         )
         self.f_z_func = ca.Function("f_z", [f_z, u, v_3, f_3z, m_3x, m_3y, m_ya], [f_z_out])
 
-    def _rnea_func(self, q_1):
+    def _init_rnea_func(self):
         """
         Performs RNEA
 
@@ -367,50 +368,12 @@ class Vehicle:
         # f_ext = [].  q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u
 
         # Dummy variable definitions
-        q_1_dot = ca.SX.sym("q_1_dot")
-        q_1_ddot = ca.SX.sym("q_1_ddot")
-
-        q_in = ca.SX.sym("q", 5)
-        q_dot = ca.SX.sym("q_dot", 5)
-        q_ddot = ca.SX.sym("q_ddot", 5)
+        q = ca.SX.sym("q", 12)
+        v = ca.SX.sym("v", 11)
+        a = ca.SX.sym("a", 11)
 
         f_z = ca.SX.sym("f_z", 2, 2)
         u = ca.SX.sym("u", 3)
-
-        # Calculating freeflyer config
-        se3 = self.track.se3_state(q_1 * self.track.length)
-        R = se3.rotation
-        q = ca.vertcat(cpin.SE3ToXYZQUAT(se3), q_in)
-
-        track_v_spatial = self.track.der_state(np.array([q_1]) * self.track.length, n=1)[0]
-        track_a_spatial = self.track.der_state(np.array([q_1]) * self.track.length, n=2)[0]
-
-        # Convert from [0, 1] normalized parameter to arc length to time derivative
-        track_v = track_v_spatial * q_1_dot * self.track.length
-        track_a = (
-            track_a_spatial * self.track.length**2 * q_1_dot**2
-            + track_v_spatial * self.track.length * q_1_ddot
-        )
-
-        J_e, J_e_dot = self.track.rotation_jacobians(q_1 * self.track.length)
-
-        # Compute ω and concatenate with spacial velocities and given joint velocities
-        # Rotate from world to body
-        body_linear_v = R.T @ track_v[:3]
-        body_angular_v = R.T @ J_e @ track_v[3:6]
-
-        v = ca.vertcat(body_linear_v, body_angular_v, q_dot)
-
-        # Compute dω and concatentate with accelerations and given joint accelerations
-        # Rotate from world to body
-        a = ca.vertcat(
-            R.T @ track_a[:3] - ca.cross(body_angular_v, body_linear_v),
-            R.T
-            @ (
-                J_e @ track_a[3:6] + J_e_dot @ track_v[3:6] * q_1_dot * self.track.length
-            ),  # TODO i think the chain rule is fixed
-            q_ddot,
-        )
 
         cpin.forwardKinematics(self.cmodel, self.cdata, q, v)
 
@@ -428,14 +391,13 @@ class Vehicle:
 
         torques = cpin.rnea(self.cmodel, self.cdata, q, v, a, f_ext)
 
-        v_1 = ca.vertcat(body_linear_v, body_angular_v)
-        ff_torque = ca.dot(v_1, torques[:6])
+        ff_torque = ca.dot(v[:6], torques[:6])
 
         # TODO check these indicies!
         # print(self.cdata.f[3].linear.size())
-        return ca.Function(
+        self.rnea_func = ca.Function(
             "rnea",
-            [q_1_dot, q_1_ddot, q_in, q_dot, q_ddot, f_z, u],
+            [q, v, a, f_z, u],
             [
                 torques,
                 ff_torque,
@@ -447,11 +409,11 @@ class Vehicle:
         )
 
     def set_constraints(self, q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u):
+
+        q_out, v, a = self.calculate_freeflyer_config(q_1)(q_1_dot, q_1_ddot, q, q_dot, q_ddot)
         f_z = f_z.reshape((2, 2))
 
-        torques, ff_torque, v_3, f_3z, m_3x, m_3y = self._rnea_func(q_1)(
-            q_1_dot, q_1_ddot, q, q_dot, q_ddot, f_z, u
-        )
+        torques, ff_torque, v_3, f_3z, m_3x, m_3y = self.rnea_func(q_out, v, a, f_z, u)
 
         v_3x = ca.vertsplit(v_3)[0]
 
@@ -484,7 +446,11 @@ class Vehicle:
         )
 
         # Positive velocity
-        self.opti.subject_to(q_1_dot > 0)
+        self.opti.subject_to(q_1_dot > 1 / self.track.length)
+
+        # Positive tire forces
+        # self.opti.subject_to(f_z[0, :] > 100)
+        # self.opti.subject_to(f_z[1, :] > 100)
 
         # Power limit
         self.opti.subject_to(u[0] * v_3x <= self.prop.e_max)
@@ -512,19 +478,69 @@ class Vehicle:
 
         for i in range(2):
             for j in range(2):
+                # f_z_safe = ca.fmax(f_z[i, j], 1e-3)
+                f_z_safe = f_z[i, j]
+
                 mu_x = (
                     self.prop.t_Dx1[i]
-                    + self.prop.t_Dx2[i] * (f_z[i, j] - self.prop.t_Fznom[i]) / self.prop.t_Fznom[i]
+                    + self.prop.t_Dx2[i] * (f_z_safe - self.prop.t_Fznom[i]) / self.prop.t_Fznom[i]
                 )
                 mu_y = (
                     self.prop.t_Dy1[i]
-                    + self.prop.t_Dy2[i] * (f_z[i, j] - self.prop.t_Fznom[i]) / self.prop.t_Fznom[i]
+                    + self.prop.t_Dy2[i] * (f_z_safe - self.prop.t_Fznom[i]) / self.prop.t_Fznom[i]
                 )
 
                 self.opti.subject_to(
-                    (f_x[i, j] / (mu_x * f_z[i, j])) ** 2 + (f_y[i, j] / (mu_y * f_z[i, j])) ** 2
-                    <= 1
+                    (f_x[i, j] / mu_x) ** 2 + (f_y[i, j] / mu_y) ** 2
+                    <= f_z_safe ** 2
                 )
+
+    def calculate_freeflyer_config(self, q_1):
+
+        q_1_dot = ca.SX.sym("q_1_dot")
+        q_1_ddot = ca.SX.sym("q_1_ddot")
+
+        q_in = ca.SX.sym("q", 5)
+        q_dot = ca.SX.sym("q_dot", 5)
+        q_ddot = ca.SX.sym("q_ddot", 5)
+
+        # Calculating freeflyer config
+        se3 = self.track.se3_state(q_1 * self.track.length)
+        R = se3.rotation
+        q_out = ca.vertcat(cpin.SE3ToXYZQUAT(se3), q_in)
+
+        track_v_spatial = self.track.der_state(np.array([q_1]) * self.track.length, n=1)[0]
+        track_a_spatial = self.track.der_state(np.array([q_1]) * self.track.length, n=2)[0]
+
+        # Convert from [0, 1] normalized parameter to arc length to time derivative
+        track_v = track_v_spatial * q_1_dot * self.track.length
+        track_a = (
+            track_a_spatial * self.track.length**2 * q_1_dot**2
+            + track_v_spatial * self.track.length * q_1_ddot
+        )
+
+        J_e, J_e_dot = self.track.rotation_jacobians(q_1 * self.track.length)
+
+        # Compute ω and concatenate with spacial velocities and given joint velocities
+        # Rotate from world to body
+        body_linear_v = R.T @ track_v[:3]
+        body_angular_v = R.T @ J_e @ track_v[3:6]
+
+        v = ca.vertcat(body_linear_v, body_angular_v, q_dot)
+
+        # Compute dω and concatentate with accelerations and given joint accelerations
+        # Rotate from world to body
+        a = ca.vertcat(
+            R.T @ track_a[:3] - ca.cross(body_angular_v, body_linear_v),
+            R.T
+            @ (
+                J_e @ track_a[3:6] + J_e_dot @ track_v[3:6] * q_1_dot * self.track.length
+            ),  # TODO i think the chain rule is fixed
+            q_ddot,
+        )
+
+        # return q_out, v, a
+        return ca.Function("freeflyer", [q_1_dot, q_1_ddot, q_in, q_dot, q_ddot], [q_out, v, a])
 
 
 if __name__ == "__main__":
