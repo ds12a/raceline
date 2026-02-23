@@ -15,6 +15,7 @@ class PacejkaModel:
         self.Ey = Ey
 
     def __call__(self, alpha, f_z):
+        # f_z = ca.fmax(f_z, 1.0)
         return self.Dy(f_z) * ca.sin(
             self.Cy(f_z)
             * ca.arctan(

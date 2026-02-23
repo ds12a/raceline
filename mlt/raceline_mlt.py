@@ -65,6 +65,11 @@ class MLTCollocation(PSCollocation):
                 U.append(ca.vertcat(U[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_u)))
                 Z.append(ca.vertcat(Z[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_z)))
 
+            # Q.append(self.opti.variable(N[k] + 2, self.n_q))
+            # Q_1_dot.append(self.opti.variable(N[k] + 2, 1))
+            # U.append(self.opti.variable(N[k] + 2, self.n_u))
+            # Z.append(self.opti.variable(N[k] + 2, self.n_z))
+
             # Generation of LG collocation points
             tau, w = np.polynomial.legendre.leggauss(N[k])  # w is the quadrature weights
             tau = np.asarray([-1] + list(tau) + [1])
@@ -87,6 +92,9 @@ class MLTCollocation(PSCollocation):
             if k != 0:
                 self.opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
                 # self.opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
+                # self.opti.subject_to(U[k - 1][-1, :] == U[k][0, :])
+                # self.opti.subject_to(Z[k - 1][-1, :] == Z[k][0, :])
+                # self.opti.subject_to(Q_1_dot[k - 1][-1, :] == Q_1_dot[k][0, :])
 
             # Collocation constraints (enforces dynamics on X)
             for i, q_1 in enumerate(t_tau[:-1]):
@@ -169,6 +177,13 @@ class MLTCollocation(PSCollocation):
             # wheelbase = sum(self.vehicle.prop.g_a)
             # kyaw = self.track.der_state(s_points, n=1)[:, 3]
             # delta_guess = np.atan(wheelbase * kyaw)
+            # delta_guess = np.atan(wheelbase * curvature)
+            # self.opti.set_initial(U[k][:, 2], delta_guess)
+
+            # s_points = t_tau * self.track.length
+            # wheelbase = sum(self.vehicle.prop.g_a)
+            # kyaw = self.track.der_state(s_points, n=1)[:, 3]
+            # delta_guess = np.atan(wheelbase * kyaw)
 
             # self.opti.set_initial(U[k][:, 2], delta_guess)
 
@@ -191,9 +206,12 @@ class MLTCollocation(PSCollocation):
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
             "ipopt.bound_relax_factor": 1e-3,
-            "ipopt.hessian_approximation": "exact",
-            # "ipopt.hessian_approximation": "limited-memory",
-            "ipopt.limited_memory_max_history": 10,
+            # "ipopt.hessian_approximation": "exact",
+            "ipopt.tol": 1e-4,
+
+            "ipopt.hessian_approximation": "limited-memory",
+            "ipopt.limited_memory_max_history": 30,
+            "ipopt.limited_memory_update_type": "bfgs",
             "ipopt.derivative_test": "none",
         }
 
@@ -264,13 +282,13 @@ class MLTCollocation(PSCollocation):
         return Trajectory(Q_sol, U_sol, Z_sol, v_sol, t, self.track.length)
 
     @staticmethod
-    def cost(q_1_dot, u, prev_u, k_delta=1e-5, k_f=1e-3):
-        return (
-            1 / ca.sqrt((q_1_dot + 1e-5) ** 2)
-            + k_f * ca.sqrt((u[0] * u[1]) ** 2)
-            + k_delta * ca.sqrt((u[2] - prev_u[2]) ** 2 + 1e-8)
-        )
+    def cost(q_1_dot, u, prev_u, k_f=1e-3, k_b=1e-6):
+        vel_cost = 1 / ca.fmax(q_1_dot, 1e-4)
+        ab_cost = ca.sqrt((u[0] * u[1]) ** 2 + 1e-8)
+        bang_cost = ca.sumsqr(u - prev_u)
 
+        return vel_cost + k_f * ab_cost + k_b * bang_cost
+    
     def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
         Samples costs at the given points and computes their trapezoidal quadrature
@@ -323,8 +341,9 @@ if __name__ == "__main__":
 
     # traj = mr.run()
 
-    mlt = MLTCollocation(config)
-    mlt.iteration(np.linspace(0, 1, 120), np.array([5] * 119)).save("mlt/generated/testing.json")
+    foo = MLTCollocation(config)
+    foo.iteration(np.linspace(0, 1, 60), np.array([3] * 59)).save("mlt/generated/testing.json")
+
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
     traj = Trajectory.load("mlt/generated/testing.json")
