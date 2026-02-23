@@ -31,16 +31,19 @@ class Track:
         # List of the interpolated polynomial over each interval
         self.poly = []
         self.length = t[-1]
+        self.colloc_t = []
 
         for k in range(len(Q)):
             # Number of collocation points
             N_k = len(Q[k]) - 2
             tau, _ = np.polynomial.legendre.leggauss(N_k)
             tau = np.asarray([-1] + list(tau) + [1])
+            self.colloc_t.extend(self.tau_to_t(tau, k))
 
             self.poly.append(
                 scipy.interpolate.BarycentricInterpolator(tau, np.column_stack([X[k], Q[k]]))
             )
+        self.colloc_t = np.array(self.colloc_t)
 
     def __call__(self, s: np.ndarray) -> np.ndarray:
         """
@@ -305,7 +308,7 @@ class Track:
 
         # Calculate track boundaries
         state = np.column_stack([X_matrix, np.concatenate(self.Q)])
-        b_l, b_r = self._find_boundaries(state)
+        b_l, b_r = self._find_boundaries(self.colloc_t)
 
         return [
             go.Scatter3d(
@@ -406,7 +409,7 @@ class Track:
         """
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         ss = trajectory.state(s)
-        r = self.raceline(self.state(s), ss[:, 3])
+        r = self.raceline(s, ss[:, 3])
 
         return go.Scatter3d(
             x=r[:, 0],
@@ -497,14 +500,16 @@ class Track:
         """
 
         r = self.raceline(
-            self.length * trajectory.colloc_t,
-            trajectory.state(trajectory.colloc_t * self.length)[:, 3],
+            trajectory.colloc_t,
+            trajectory.state(trajectory.colloc_t)[:, 3],
         )
 
+        print(r)
+
         return go.Scatter3d(
-            x=r[:, 0].flatten(),
-            y=r[:, 1].flatten(),
-            z=r[:, 2].flatten(),
+            x=r[:, 0],
+            y=r[:, 1],
+            z=r[:, 2] + 1,
             name="colloc",
             mode="markers",
             # marker=dict(size=5),

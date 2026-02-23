@@ -121,7 +121,7 @@ class MLTCollocation(PSCollocation):
 
             # Initial guesses
             # Velocity
-            v_guess = 10
+            v_guess = 100
             self.opti.set_initial(Q_1_dot[k][:, :], v_guess / self.track.length)
 
             # Vertical tire forces
@@ -206,12 +206,12 @@ class MLTCollocation(PSCollocation):
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
             "ipopt.bound_relax_factor": 1e-3,
-            # "ipopt.hessian_approximation": "exact",
+            "ipopt.hessian_approximation": "exact",
             "ipopt.tol": 1e-4,
 
-            "ipopt.hessian_approximation": "limited-memory",
-            "ipopt.limited_memory_max_history": 30,
-            "ipopt.limited_memory_update_type": "bfgs",
+            # "ipopt.hessian_approximation": "limited-memory",
+            # "ipopt.limited_memory_max_history": 30,
+            # "ipopt.limited_memory_update_type": "bfgs",
             "ipopt.derivative_test": "none",
         }
 
@@ -320,7 +320,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/track.json",
+        "track": "track_import/generated/monza.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     # traj = mr.run()
 
     mlt = MLTCollocation(config)
-    mlt.iteration(np.linspace(0, 1, 60), np.array([3] * 59)).save("mlt/generated/testing.json")
+    mlt.iteration(np.linspace(0, 1, 120), np.array([4] * 119)).save("mlt/generated/testing.json")
 
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
@@ -357,8 +357,8 @@ if __name__ == "__main__":
 
     fig.add_traces(
         [
-            *fine_plot,
             mlt.track.plot_raceline_colloc(traj),
+            *fine_plot,
             # foo.track.plot_raceline_uniform(traj),
             *mlt.track.plot_car_bounds(traj, props.g_t),
         ]
