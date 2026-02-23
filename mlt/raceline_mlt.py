@@ -176,7 +176,7 @@ class MLTCollocation(PSCollocation):
         self.opti.minimize(J)
 
         ipopt_settings = {
-            # "ipopt.print_frequency_iter": 50,
+            "ipopt.print_frequency_iter": 50,
             "print_time": 0,
             "ipopt.sb": "no",
             "ipopt.max_iter": 1000,
@@ -184,8 +184,11 @@ class MLTCollocation(PSCollocation):
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
-            "ipopt.bound_relax_factor": 0,
-            "ipopt.hessian_approximation": "exact",
+            "ipopt.bound_relax_factor": 1e-3,
+            # "ipopt.hessian_approximation": "exact",
+
+            "ipopt.hessian_approximation": "limited-memory",
+            "ipopt.limited_memory_max_history": 10,
             "ipopt.derivative_test": "none",
         }
 
@@ -283,16 +286,16 @@ if __name__ == "__main__":
         },
     }
 
-    mr = MeshRefinement(MLTCollocation(config), r_config)
+    # mr = MeshRefinement(MLTCollocation(config), r_config)
 
-    traj = mr.run()
+    # traj = mr.run()
 
     foo = MLTCollocation(config)
-    # foo.iteration(np.linspace(0, 1, 100), np.array([3] * 99)).save("mlt/generated/testing.json")
+    foo.iteration(np.linspace(0, 1, 100), np.array([4] * 99)).save("mlt/generated/testing.json")
 
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
-    # traj = Trajectory.load("mlt/generated/testing.json")
+    traj = Trajectory.load("mlt/generated/testing.json")
 
     # Visualize
     fine_plot, _ = foo.track.plot_uniform(1)
