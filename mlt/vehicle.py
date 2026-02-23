@@ -370,6 +370,8 @@ class Vehicle:
         f_z = ca.SX.sym("f_z", 2, 2)
         u = ca.SX.sym("u", 3)
 
+        J_t = ca.SX.sym("J_t", 6)
+
         cpin.forwardKinematics(self.cmodel, self.cdata, q, v)
 
         v_3 = self.cdata.v[self.yaw_id].vector
@@ -386,12 +388,12 @@ class Vehicle:
 
         torques = cpin.rnea(self.cmodel, self.cdata, q, v, a, f_ext)
 
-        ff_torque = ca.dot(v[:6], torques[:6])
+        ff_torque = ca.dot(J_t, torques[:6])
 
         # TODO check these indicies!
         self.rnea_func = ca.Function(
             "rnea",
-            [q, v, a, f_z, u],
+            [q, v, a, f_z, u, J_t],
             [
                 torques,
                 ff_torque,
@@ -404,10 +406,10 @@ class Vehicle:
 
     def set_constraints(self, q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u):
 
-        q_out, v, a = self.calculate_freeflyer_config(q_1)(q_1_dot, q_1_ddot, q, q_dot, q_ddot)
+        ff_conf, J_t = self.calculate_freeflyer_config(q_1)
+        q_out, v, a = ff_conf(q_1_dot, q_1_ddot, q, q_dot, q_ddot)
         f_z = f_z.reshape((2, 2))
-
-        torques, ff_torque, v_3, f_3z, m_3x, m_3y = self.rnea_func(q_out, v, a, f_z, u)
+        torques, ff_torque, v_3, f_3z, m_3x, m_3y = self.rnea_func(q_out, v, a, f_z, u, ca.DM(J_t))
 
         v_3x = ca.vertsplit(v_3)[0]
 
@@ -520,6 +522,11 @@ class Vehicle:
 
         v = ca.vertcat(body_linear_v, body_angular_v, q_dot)
 
+
+        J_track_lin = R.T @ (track_v_spatial[:3] * self.track.length)
+        J_track_ang = R.T @ (J_e @ track_v_spatial[3:6] * self.track.length)
+        J_track = ca.vertcat(J_track_lin, J_track_ang)
+
         # Compute dω and concatentate with accelerations and given joint accelerations
         # Rotate from world to body
         a = ca.vertcat(
@@ -532,7 +539,7 @@ class Vehicle:
         )
 
         # return q_out, v, a
-        return ca.Function("freeflyer", [q_1_dot, q_1_ddot, q_in, q_dot, q_ddot], [q_out, v, a])
+        return ca.Function("freeflyer", [q_1_dot, q_1_ddot, q_in, q_dot, q_ddot], [q_out, v, a]), J_track
 
 
 if __name__ == "__main__":

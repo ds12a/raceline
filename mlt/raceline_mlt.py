@@ -205,9 +205,9 @@ class MLTCollocation(PSCollocation):
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
-            "ipopt.bound_relax_factor": 1e-3,
+            # "ipopt.bound_relax_factor": 1e-3,
             "ipopt.hessian_approximation": "exact",
-            "ipopt.tol": 1e-4,
+            # "ipopt.tol": 1e-4,
 
             # "ipopt.hessian_approximation": "limited-memory",
             # "ipopt.limited_memory_max_history": 30,
