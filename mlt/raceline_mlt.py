@@ -55,6 +55,7 @@ class MLTCollocation(PSCollocation):
 
                 U.append(self.opti.variable(N[k] + 2, self.n_u))
                 Z.append(self.opti.variable(N[k] + 2, self.n_z))
+
             else:
                 # Explicitly couples last of previous segment with first of current segment
                 # by setting them as the same variable
@@ -115,24 +116,23 @@ class MLTCollocation(PSCollocation):
             v_guess = 10
             self.opti.set_initial(Q_1_dot[k][:, :], v_guess / self.track.length)
 
-
             # Vertical tire forces
-            # print(Z[k])
             for i in range(2):
-                downforce = self.vehicle.env.rho / 2 * self.vehicle.prop.g_S * v_guess ** 2 * self.vehicle.prop.a_Cz[i]
+                downforce = (
+                    self.vehicle.env.rho
+                    / 2
+                    * self.vehicle.prop.g_S
+                    * v_guess**2
+                    * self.vehicle.prop.a_Cz[i]
+                )
                 for j in range(2):
                     self.opti.set_initial(
-                        Z[k][:, 2 * i + j], ((self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4 + downforce / 2)
+                        Z[k][:, 2 * i + j],
+                        (
+                            (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
+                            + downforce / 2
+                        ),
                     )
-            #         print("foo")
-            #         print((self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4)
-            #         print(downforce)
-            #         print((self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4 + downforce)
-
-            # self.opti.set_initial(
-            #     Z[k][:, :], (self.vehicle.prop.m_sprung + self.vehicle.prop.m_unsprung) * 9.81 / 4
-            # )
-
 
             # q4
             self.opti.set_initial(
@@ -145,24 +145,30 @@ class MLTCollocation(PSCollocation):
             # Fxa equal with initial drag
             self.opti.set_initial(
                 U[k][:, 0],
-                0.5 * self.vehicle.env.rho * self.vehicle.prop.g_S * self.vehicle.prop.a_Cx * v_guess**2,
+                # self.vehicle.prop.e_max / v_guess,
+                0.5
+                * self.vehicle.env.rho
+                * self.vehicle.prop.g_S
+                * self.vehicle.prop.a_Cx
+                * v_guess**2,
             )
 
             # delta
-            # curvature = np.sqrt(np.sum(self.track.der_state(t_tau * self.track.length, 2)[:, :3]**2, axis=1))
-            # normal = self.track.normal(self.track(t_tau))
-            # tangent = self.track.der_state(t_tau)[:, :3]
-            # b = np.cross(normal, tangent, axis=1)
- 
-            # curvature[b[:, 2] > 0] *= -1
-            # wheelbase = sum(self.vehicle.prop.g_a)
-            # delta_guess = np.atan(wheelbase * curvature)
-            # self.opti.set_initial(U[k][:, 2], delta_guess)
+            curvature = np.sqrt(
+                np.sum(self.track.der_state(t_tau * self.track.length, 2)[:, :3] ** 2, axis=1)
+            )
+            b = self.track.tnb_better(t_tau * self.track.length)[2]
 
-            s_points = t_tau * self.track.length
+            curvature[b[:, 2] < 0] *= -1
             wheelbase = sum(self.vehicle.prop.g_a)
-            kyaw = self.track.der_state(s_points, n=1)[:, 3]
-            delta_guess = np.atan(wheelbase * kyaw)
+            delta_guess = np.atan(wheelbase * curvature)
+
+            self.opti.set_initial(U[k][:, 2], delta_guess)
+
+            # s_points = t_tau * self.track.length
+            # wheelbase = sum(self.vehicle.prop.g_a)
+            # kyaw = self.track.der_state(s_points, n=1)[:, 3]
+            # delta_guess = np.atan(wheelbase * kyaw)
 
             # self.opti.set_initial(U[k][:, 2], delta_guess)
 
@@ -176,18 +182,17 @@ class MLTCollocation(PSCollocation):
         self.opti.minimize(J)
 
         ipopt_settings = {
-            "ipopt.print_frequency_iter": 50,
+            # "ipopt.print_frequency_iter": 50,
             "print_time": 0,
             "ipopt.sb": "no",
-            "ipopt.max_iter": 1000,
+            "ipopt.max_iter": 2000,
             "detect_simple_bounds": True,
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
             "ipopt.bound_relax_factor": 1e-3,
-            # "ipopt.hessian_approximation": "exact",
-
-            "ipopt.hessian_approximation": "limited-memory",
+            "ipopt.hessian_approximation": "exact",
+            # "ipopt.hessian_approximation": "limited-memory",
             "ipopt.limited_memory_max_history": 10,
             "ipopt.derivative_test": "none",
         }
@@ -216,6 +221,37 @@ class MLTCollocation(PSCollocation):
             stats = sol.stats()
             print(f"Solve iteration failed after {stats['iter_count']} iteration...")
 
+            g = self.opti.debug.value(self.opti.g)
+            print(f"Initial infeasibility: max |g| = {np.max(np.abs(g)):.3e}")
+            # Diagnostics
+            worst_20 = np.argsort(np.abs(g))[-200:][::-1]
+            constraint_names = [
+                "fz_implicit_0",
+                "fz_implicit_1",
+                "fz_implicit_2",
+                "fz_implicit_3",
+                "ff_torque",
+                "road_lat",
+                "yaw",
+                "vert",
+                "pitch",
+                "roll",
+                "min_speed",
+                "power_limit",
+                "fxa_pos",
+                "fxb_pos",
+                "steer_bounds",
+                "track_bounds",
+                "friction_ellipse_0",
+                "friction_ellipse_1",
+                "friction_ellipse_2",
+                "friction_ellipse_3",
+            ]
+            for idx in worst_20:
+                local = idx % 20
+                point = idx // 20
+                print(f"  g[{idx}] = {g[idx]:+.3e}  ->  {constraint_names[local]}  @ point {point}")
+
         print(f"Final cost: {sol.value(J)}")
 
         # Collect solution
@@ -223,15 +259,18 @@ class MLTCollocation(PSCollocation):
         Q_sol = [sol.value(seg) for seg in Q]
         Z_sol = [sol.value(seg) for seg in Z]
         v_sol = [sol.value(seg) for seg in Q_1_dot]
-        # all_t = np.array(all_t)
 
         # Create Trajectory and save it
         return Trajectory(Q_sol, U_sol, Z_sol, v_sol, t, self.track.length)
 
     @staticmethod
     def cost(q_1_dot, u, prev_u, k_delta=1e-5, k_f=1e-3):
-        return 1 / q_1_dot + k_f * (u[0] * u[1]) + k_delta * ca.sqrt((u[2] - prev_u[2])**2 + 1e-8)
-    
+        return (
+            1 / ca.sqrt((q_1_dot + 1e-5) ** 2)
+            + k_f * ca.sqrt((u[0] * u[1]) ** 2)
+            + k_delta * ca.sqrt((u[2] - prev_u[2]) ** 2 + 1e-8)
+        )
+
     def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
         Samples costs at the given points and computes their trapezoidal quadrature
@@ -245,28 +284,22 @@ class MLTCollocation(PSCollocation):
         """
 
         # Measures runge phenomena at a point
-        
         state = traj(points * traj.length)
         linstate = traj.linstate(points * traj.length)
-
-        # print(state, linstate)
 
         v_poly = state[:, -1]
         v_lin = linstate[:, -1]
 
-        fz_poly = state[:, -2]   # just measure one wheel
+        fz_poly = state[:, -2]  # just measure one wheel
         fz_lin = linstate[:, -2]
 
         v_defect = ((v_poly - v_lin) / (np.abs(v_lin) + 1e-5)) ** 2
         fz_defect = ((fz_poly - fz_lin) / (np.abs(fz_lin) + 1e-5)) ** 2
 
-        # print(v_defect, fz_defect)
-
         return v_defect + fz_defect, np.trapezoid((v_defect + fz_defect), x=points)
 
 
 if __name__ == "__main__":
-
 
     config = {
         "track": "track_import/generated/track.json",
@@ -290,15 +323,14 @@ if __name__ == "__main__":
 
     # traj = mr.run()
 
-    foo = MLTCollocation(config)
-    foo.iteration(np.linspace(0, 1, 100), np.array([4] * 99)).save("mlt/generated/testing.json")
-
+    mlt = MLTCollocation(config)
+    mlt.iteration(np.linspace(0, 1, 120), np.array([5] * 119)).save("mlt/generated/testing.json")
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
     traj = Trajectory.load("mlt/generated/testing.json")
 
     # Visualize
-    fine_plot, _ = foo.track.plot_uniform(1)
+    fine_plot, _ = mlt.track.plot_uniform(1)
 
     traj.plot_collocation()
 
@@ -307,12 +339,12 @@ if __name__ == "__main__":
     fig.add_traces(
         [
             *fine_plot,
-            foo.track.plot_raceline_colloc(traj),
+            mlt.track.plot_raceline_colloc(traj),
             # foo.track.plot_raceline_uniform(traj),
-            *foo.track.plot_car_bounds(traj, props.g_t),
+            *mlt.track.plot_car_bounds(traj, props.g_t),
         ]
     )
-    fig.add_trace(foo.track.plot_ribbon())
+    fig.add_trace(mlt.track.plot_ribbon())
 
     fig.update_layout(
         scene=dict(

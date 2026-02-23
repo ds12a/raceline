@@ -38,20 +38,17 @@ class Trajectory:
         self.t = t * track_length       # q1
         self.length = track_length
         self.colloc_t = []              # all collocation times
-        foo = []
 
         # List of the interpolated polynomial over each interval
         # [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
         self.poly = []
-        allt = []
 
         for k in range(len(Q)):
             # Number of collocation points
             N_k = len(Q[k]) - 2
             tau, _ = np.polynomial.legendre.leggauss(N_k)
             tau = np.asarray([-1] + list(tau) + [1])
-            self.colloc_t.extend(self.tau_to_t(tau[:-1], k))       # misses last element but thats probably fine
-            foo.extend(self.tau_to_t(tau, k))
+            self.colloc_t.extend(self.tau_to_t(tau, k))       # misses last element but thats probably fine
 
             self.poly.append(
                 scipy.interpolate.BarycentricInterpolator(
@@ -60,8 +57,7 @@ class Trajectory:
             )
         self.colloc_t = np.array(self.colloc_t)
         flattened_all = np.vstack([np.column_stack([U[k], Q[k], self.Z[k], self.v[k]]) for k in range(len(Q))])
-        print(np.array(foo).flatten().shape, flattened_all.shape)
-        self.linfit = scipy.interpolate.interp1d(np.array(foo).flatten(), flattened_all, axis=0)
+        self.linfit = scipy.interpolate.interp1d(self.colloc_t, flattened_all, axis=0)
 
     def __call__(self, s: np.ndarray) -> np.ndarray:
         """
@@ -99,8 +95,9 @@ class Trajectory:
 
 
     # david why this exist it looked balls on track fitting too
+    # aaron you managed to break plotting
     # why not
-    def plot_collocation(self, approx_spacing: float = 0.1, plot_uniform = False, plot_q = False):
+    def plot_collocation(self, approx_spacing: float = 0.1, plot_uniform = True, plot_q = True):
         self.plot_params(self.colloc_t, approx_spacing, plot_uniform, plot_q)
 
 

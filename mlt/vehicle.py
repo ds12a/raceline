@@ -459,32 +459,35 @@ class Vehicle:
         self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) == f_z)
 
         # J_e, _ = self.track.rotation_jacobians(q_1 * self.track.length)
-        self.opti.subject_to(ff_torque == 0)  # TODO check math here and see if necessary
+        p = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81 * 10
+        f = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81
 
-        self.opti.subject_to(torques[6] == 0)  # road_lat
-        self.opti.subject_to(torques[7] == 0)  # yaw
+        self.opti.subject_to(ff_torque / p == 0)  # TODO check math here and see if necessary
+
+        self.opti.subject_to(torques[6] / f == 0)  # road_lat
+        self.opti.subject_to(torques[7] / f == 0)  # yaw
 
         # Vert
         self.opti.subject_to(
-            torques[8] == -self.prop.p(self.prop.s_k) * q[2] - self.prop.p(self.prop.s_c) * q_dot[2]
+            torques[8] / f== (-self.prop.p(self.prop.s_k) * q[2] - self.prop.p(self.prop.s_c) * q_dot[2]) / f
         )
 
         # Pitch
         self.opti.subject_to(
-            torques[9]
-            == -self.prop.p_theta(self.prop.s_k) * q[3]
-            - self.prop.p_theta(self.prop.s_c) * q_dot[3]
+            torques[9] / f
+            == (-self.prop.p_theta(self.prop.s_k) * q[3]
+            - self.prop.p_theta(self.prop.s_c) * q_dot[3]) / f
         )
 
         # Roll
         self.opti.subject_to(
-            torques[10]
-            == -(self.prop.p_phi(self.prop.s_k) + sum(self.prop.p_karb)) * q[4]
-            - self.prop.p_phi(self.prop.s_c) * q_dot[4]
+            torques[10] / f
+            == (-(self.prop.p_phi(self.prop.s_k) + sum(self.prop.p_karb)) * q[4]
+            - self.prop.p_phi(self.prop.s_c) * q_dot[4]) / f
         )
 
         # Positive velocity
-        self.opti.subject_to(q_1_dot > 0)
+        self.opti.subject_to(q_1_dot > 5 / self.track.length)
 
         # Power limit
         self.opti.subject_to(u[0] * v_3x <= self.prop.e_max)

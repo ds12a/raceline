@@ -53,8 +53,8 @@ class Track:
             np.ndarray: Array whose columns are [b_l, b_r, x, y, z]
         """
         state = self.state(s)
-        b_l, b_r = self._find_boundaries(state)
-        return np.column_stack([b_l, b_r, state[:, :3]])
+        b_l, b_r = self._find_boundaries(s)
+        return np.column_stack([b_l, b_r, state[:, :3]]) 
 
     def state(self, s: np.ndarray) -> np.ndarray:
         """
@@ -68,7 +68,6 @@ class Track:
                         for each given arc length parameter
         """
         s = s % self.length
-        # k = np.searchsorted(self.t[1:], s)
 
         tau, k = self.t_to_tau(s)
         return np.asarray([self.poly[interval](parameter) for parameter, interval in zip(tau, k)])
@@ -157,60 +156,55 @@ class Track:
         rots = R.from_euler("ZYX", e_angles).as_matrix()
 
         return [rots[:, :, i] for i in range(3)]
+    
+    def tnb_better(self, s):
+        n = self.der_state(s, n=2)[:, :3]
 
-    # TODO refactor stuff that uses this to use tnb (it is cleaner, this yucky)
-    def normal(self, state):
-        # State is in the form [[x, y, z, theta, mu, phi, n_l, n_r], ...]
-        theta = state[:, 3]
-        mu = state[:, 4]
-        phi = state[:, 5]
+        t = self.der_state(s)[:, :3]
 
-        return np.column_stack(
-            [
-                np.cos(theta) * np.sin(mu) * np.sin(phi) - np.sin(theta) * np.cos(phi),
-                np.sin(theta) * np.sin(mu) * np.sin(phi) + np.cos(theta) * np.cos(phi),
-                np.cos(mu) * np.sin(phi),
-            ]
-        )
+        b = np.cross(t, n, axis=1)
 
-    def _find_boundaries(self, state: np.ndarray) -> tuple[float, float]:
+        return t, n, b
+
+
+    def _find_boundaries(self, s: np.ndarray) -> tuple[float, float]:
         """
         Computes track boundaries
 
         Args:
-            state (np.ndarray): Array of states at each point
-                                [[x, y, z, theta, mu, phi, n_l, n_r], ...]
+            s (np.ndarray): Arc length parameters to evaluate boundaries at
 
         Returns:
             tuple: Tuple of left and right boundaries (b_l, b_r)
         """
         # State is in the form [[x, y, z, theta, mu, phi, n_l, n_r], ...]
+        state = self.state(s)
         x = state[:, :3]
         n_l = state[:, 6]
         n_r = state[:, 7]
 
-        n = self.normal(state)
+        n = self.tnb(s)[1]
 
         b_l = x + n * n_l[:, np.newaxis]
         b_r = x + n * n_r[:, np.newaxis]
 
         return b_l, b_r
 
-    def raceline(self, state: np.ndarray, lateral_displacement: float) -> np.ndarray:
+    def raceline(self, s: np.ndarray, lateral_displacement: float) -> np.ndarray:
         """
         Computes raceline
 
         Args:
-            state (np.ndarray): Array of states at each point
-                                [[x, y, z, theta, mu, phi, n_l, n_r], ...]
+            s (np.ndarray): Arc length parameters
 
 
         Returns:
         """
         # State is in the form [[x, y, z, theta, mu, phi, n_l, n_r], ...]
+        state = self.state(s)
         x = state[:, :3]
 
-        n = self.normal(state)
+        n = self.tnb(s)[1]
 
         raceline_point = x + n * lateral_displacement[:, np.newaxis]
 
@@ -292,7 +286,7 @@ class Track:
             y=np.array([points[:, 1], points[:, 4]]),
             z=np.array([points[:, 2], points[:, 5]]),
             opacity=0.9,
-            colorscale=[[0, "#D3D3D3"], [1, "#D3D3D3"]],
+            colorscale=[[0, "#797979"], [1, "#D3D3D3"]],
             showscale=False,
         )
 
@@ -437,10 +431,8 @@ class Track:
         ss = trajectory.state(s)
         heading_angle = ss[:, 4]
 
-        r = self.raceline(self.state(s), ss[:, 3])
+        r = self.raceline(s, ss[:, 3])
         t, _, b = self.tnb(s)
-
-        # print(t[0], b[0])
 
         # calculation of heading vec for car
         heading_trans = R.from_rotvec(b * heading_angle[:, np.newaxis])
@@ -450,7 +442,6 @@ class Track:
         n_v = np.cross(b, h_v)
         n_v = n_v / np.linalg.norm(n_v, axis=1, keepdims=True)  # normalize just in case
 
-        print(n_v[0])
         width = max(g_t) / 2
 
         r += np.array([0, 0, 0.1])
@@ -504,16 +495,11 @@ class Track:
         Returns:
             go.Scatter3d: Raceline trajectory graph
         """
-        print("len", len(trajectory.colloc_t))
+
         r = self.raceline(
-            self.state(self.length * trajectory.colloc_t),
+            self.length * trajectory.colloc_t,
             trajectory.state(trajectory.colloc_t * self.length)[:, 3],
         )
-        print("len2", len(r))
-        print(r)
-        print(len(r[:, 0]))
-        print(len(r[:, 1]))
-        print(len(r[:, 2]))
 
         return go.Scatter3d(
             x=r[:, 0].flatten(),
@@ -521,5 +507,5 @@ class Track:
             z=r[:, 2].flatten(),
             name="colloc",
             mode="markers",
-            marker=dict(size=5),
+            # marker=dict(size=5),
         )
