@@ -2,10 +2,6 @@ import numpy as np
 import scipy.interpolate
 import plotly.graph_objects as go
 import json
-import pinocchio as pin
-import pinocchio.casadi as cpin
-import casadi as ca
-import plotly.express as px
 
 
 class Trajectory:

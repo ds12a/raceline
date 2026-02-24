@@ -225,7 +225,8 @@ class Vehicle:
         f_xa, f_xb, delta = ca.vertsplit(u)
         v_3x, v_3y, _, _, _, omega_3z = ca.vertsplit(v_3)
 
-        v_3x = ca.fmax(v_3x, 0.1)
+        v_3x = 0.5 * (v_3x + ca.sqrt(v_3x**2 + 0.01**2)) # ca.fmax(v_3x, 0.1)
+
         # Wheel slip (alpha)
         alpha_out = ca.vertcat(
             delta - (v_3y + omega_3z * self.prop.g_a[0]) / v_3x,
@@ -414,7 +415,12 @@ class Vehicle:
         v_3x = ca.vertsplit(v_3)[0]
 
         m_ya = self.w6_func(v_3)[-1]
-        self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) == f_z)
+
+        fz_ref = Vehicle._2d_list_to_SX(
+            [[self.prop.t_Fznom[i]] * 2 for i in range(2)]
+        )
+
+        self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) / fz_ref == f_z / fz_ref)
 
         # J_e, _ = self.track.rotation_jacobians(q_1 * self.track.length)
         p = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81 * 10
@@ -448,7 +454,7 @@ class Vehicle:
         self.opti.subject_to(q_1_dot > 5 / self.track.length)
 
         # Power limit
-        self.opti.subject_to(u[0] * v_3x <= self.prop.e_max)
+        self.opti.subject_to(u[0] * v_3x / self.prop.e_max <= 1)
 
         # Control bounds
         self.opti.subject_to(u[0] >= 0)
@@ -485,9 +491,11 @@ class Vehicle:
                     + self.prop.t_Dy2[i] * (f_z_safe - self.prop.t_Fznom[i]) / self.prop.t_Fznom[i]
                 )
 
+                F_ref = self.prop.t_Fznom[i]
+
                 self.opti.subject_to(
-                    (f_x[i, j] / mu_x) ** 2 + (f_y[i, j] / mu_y) ** 2
-                    <= f_z_safe ** 2
+                    (f_x[i,j] / (mu_x * F_ref))**2 + (f_y[i,j] / (mu_y * F_ref))**2
+                    <= (f_z_safe / F_ref)**2
                 )
 
     def calculate_freeflyer_config(self, q_1):

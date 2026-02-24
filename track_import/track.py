@@ -504,12 +504,11 @@ class Track:
             trajectory.state(trajectory.colloc_t)[:, 3],
         )
 
-        print(r)
 
         return go.Scatter3d(
             x=r[:, 0],
             y=r[:, 1],
-            z=r[:, 2] + 1,
+            z=r[:, 2],
             name="colloc",
             mode="markers",
             # marker=dict(size=5),

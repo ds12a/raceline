@@ -3,6 +3,7 @@ from mesh_refinement.collocation import Collocation
 from scipy.stats import gmean
 import math
 import numpy as np
+import plotly.graph_objects as go
 
 
 class MeshRefinement:
@@ -25,6 +26,7 @@ class MeshRefinement:
 
         # Runs iter of collocation on initial points
         candidate = self.colloc.iteration(self.t, self.N)
+        self.plot_candidate(candidate, "initial")
 
         # Samples finely for cost function error
         best_eval = candidate
@@ -44,7 +46,7 @@ class MeshRefinement:
             print(
                 f"Fitting with {len(self.N)} segments with a segment maximum of {max(self.N)} collocation points and total sum of {self.N.sum()} collocation points"
             )
-            candidate = self.colloc.iteration(self.t, self.N)
+            candidate = self.colloc.iteration(self.t, self.N, best_eval)
             _, new_cost = self.colloc.sample_cost(candidate, sample_t)
 
             print(f"Sampled error: {new_cost:e}")
@@ -53,6 +55,10 @@ class MeshRefinement:
                 best_eval = candidate
                 best_iter = i + 1
                 best_cost = new_cost
+
+            
+            self.plot_candidate(candidate, i)
+            
 
         # track.ccw = ccw
 
@@ -96,7 +102,7 @@ class MeshRefinement:
 
         # TODO this is an approximation, check if it is satisfactory
         geo_mean_cost = np.exp(geo_mean_cost / total_samples)
-        
+
         for i, start in enumerate(interval_starts):
             end = self.t[i + 1]
             sample_t = samples[i]
@@ -144,3 +150,27 @@ class MeshRefinement:
         print(f"Degree increased: {deg_counter}\tDivided: {div_counter}\tSkipped: {skip_counter}")
         assert len(new_N) + 1 == len(new_t)
         return np.array(new_N), np.array(new_t)
+
+    def plot_candidate(self, candidate, i):
+        fig = go.Figure()
+
+        fig.add_traces(
+            [
+                self.colloc.track.plot_raceline_colloc(candidate),
+                *self.colloc.track.plot_car_bounds(candidate,  self.colloc.vehicle.prop.g_t),
+                self.colloc.track.plot_ribbon()
+            ]
+        )
+        fig.update_layout(
+            scene=dict(
+                aspectmode="data",
+                xaxis=dict(showbackground=False),
+                yaxis=dict(showbackground=False),
+                zaxis=dict(showbackground=False),
+            ),
+            legend=dict(
+                orientation="h",
+            ),
+            title=f"iteration {i}"
+        )
+        fig.show()
