@@ -307,13 +307,8 @@ class Track:
         X_matrix = np.concatenate(self.X)
 
         # Calculate track boundaries
-<<<<<<< Updated upstream
         state = np.column_stack([X_matrix, np.concatenate(self.Q)])
         b_l, b_r = self._find_boundaries(self.colloc_t)
-=======
-        # state = np.column_stack([X_matrix, np.concatenate(self.Q)])
-        b_l, b_r = self._find_boundaries(state)
->>>>>>> Stashed changes
 
         return [
             go.Scatter3d(
