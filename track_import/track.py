@@ -289,7 +289,7 @@ class Track:
             y=np.array([points[:, 1], points[:, 4]]),
             z=np.array([points[:, 2], points[:, 5]]),
             opacity=0.9,
-            colorscale=[[0, "#797979"], [1, "#D3D3D3"]],
+            colorscale=[[0, "#D3D3D3"], [1, "#D3D3D3"]],
             showscale=False,
         )
 
@@ -307,8 +307,13 @@ class Track:
         X_matrix = np.concatenate(self.X)
 
         # Calculate track boundaries
+<<<<<<< Updated upstream
         state = np.column_stack([X_matrix, np.concatenate(self.Q)])
         b_l, b_r = self._find_boundaries(self.colloc_t)
+=======
+        # state = np.column_stack([X_matrix, np.concatenate(self.Q)])
+        b_l, b_r = self._find_boundaries(state)
+>>>>>>> Stashed changes
 
         return [
             go.Scatter3d(

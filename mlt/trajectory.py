@@ -93,7 +93,7 @@ class Trajectory:
     # david why this exist it looked balls on track fitting too
     # aaron you managed to break plotting
     # why not
-    def plot_collocation(self, approx_spacing: float = 0.1, plot_uniform = True, plot_q = True):
+    def plot_collocation(self, approx_spacing: float = 0.1, plot_uniform = True, plot_q = False):
         self.plot_params(self.colloc_t, approx_spacing, plot_uniform, plot_q)
 
 

@@ -333,7 +333,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/zandvoort.json",
+        "track": "track_import/generated/cota_test.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
