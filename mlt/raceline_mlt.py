@@ -91,17 +91,17 @@ class MLTCollocation(PSCollocation):
                 self.opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
 
             # Collocation constraints (enforces dynamics on X)
-            for i, q_1 in enumerate(t_tau[1:-1]):
+            for i, q_1 in enumerate(t_tau[:-1]):
 
                 self.vehicle.set_constraints(
                     q_1,
-                    Q_1_dot[k][i + 1, :],
-                    Q_1_ddot[i + 1, :],
-                    Q_dot[k][i + 1, :],
-                    Q_ddot[k][i + 1, :],
-                    Q[k][i + 1, :],
-                    Z[k][i + 1, :],
-                    U[k][i + 1, :],
+                    Q_1_dot[k][i, :],
+                    Q_1_ddot[i, :],
+                    Q_dot[k][i, :],
+                    Q_ddot[k][i, :],
+                    Q[k][i, :],
+                    Z[k][i, :],
+                    U[k][i, :],
                 )
 
             # Quadrature cost
@@ -197,8 +197,8 @@ class MLTCollocation(PSCollocation):
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
-            "ipopt.bound_relax_factor": 1e-3,
-            # "ipopt.hessian_approximation": "exact",
+            # "ipopt.bound_relax_factor": 1e-3,
+            "ipopt.hessian_approximation": "exact",
             "ipopt.tol": 1e-4,
             "ipopt.hessian_approximation": "limited-memory",
             "ipopt.limited_memory_max_history": 30,
@@ -350,13 +350,13 @@ if __name__ == "__main__":
         },
     }
 
-    mr = MeshRefinement(MLTCollocation(config), r_config)
+    mlt = MLTCollocation(config)
+    mr = MeshRefinement(mlt, r_config)
 
-    traj = mr.run()
-    traj.save("mlt/generated/testing.json")
+    # traj = mr.run()
+    # traj.save("mlt/generated/testing.json")
 
-    # mlt = MLTCollocation(config)
-    # mlt.iteration(np.linspace(0, 1, 100), np.array([4] * 99)).save("mlt/generated/testing.json")
+    mlt.iteration(np.linspace(0, 1, 100), np.array([4] * 99)).save("mlt/generated/testing.json")
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
     traj = Trajectory.load("mlt/generated/testing.json")
