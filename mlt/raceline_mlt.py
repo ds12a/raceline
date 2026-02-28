@@ -356,7 +356,7 @@ if __name__ == "__main__":
     # traj = mr.run()
     # traj.save("mlt/generated/testing.json")
 
-    mlt.iteration(np.linspace(0, 1, 100), np.array([4] * 99)).save("mlt/generated/testing.json")
+    mlt.iteration(np.linspace(0, 1, 10), np.array([20] * 9)).save("mlt/generated/testing.json")
 
     props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
     traj = Trajectory.load("mlt/generated/testing.json")

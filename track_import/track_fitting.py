@@ -131,7 +131,7 @@ def fit_iteration(
         # Continuity constraints
         if k != 0:
             opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
-            opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
+            # opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
 
         # Collocation constraints (enforces dynamics on X)
         theta = Q[k][:-1, 0]

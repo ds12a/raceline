@@ -91,22 +91,39 @@ if __name__ == "__main__":
         fig = go.Figure()
 
         fine_plot, q_fine = track.plot_uniform(1)
+        ribbon = track.plot_ribbon()
         collocation_plot, q_collocation = track.plot_collocation()
 
-        for i in fine_plot:
+        for i in (*fine_plot, ribbon, *collocation_plot, *plots):
             fig.add_trace(i)
 
-        for i in collocation_plot:
-            fig.add_trace(i)
-
-        for i in plots:
-            fig.add_trace(i)
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(showbackground=False),
+                yaxis=dict(showbackground=False),
+                zaxis=dict(showbackground=False),
+            ),
+            legend=dict(
+                orientation="h",
+            ),
+        )
 
         fig.show()
 
-        fig.update_layout(scene=dict(aspectmode="data"))
+        fig.update_layout(
+            scene=dict(
+                aspectmode="data",
+                xaxis=dict(showbackground=False),
+                yaxis=dict(showbackground=False),
+                zaxis=dict(showbackground=False),
+            ),
+            legend=dict(
+                orientation="h",
+            ),
+        )
         fig.show()
 
         # Plot theta, mu, phi
-        q_fig = go.Figure(data=[q_collocation, q_fine])
-        q_fig.show()
+        # TODO maybe add a for fun config for this
+        # q_fig = go.Figure(data=[q_collocation, q_fine])
+        # q_fig.show()

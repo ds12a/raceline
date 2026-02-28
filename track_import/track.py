@@ -317,7 +317,7 @@ class Track:
                 z=X_matrix[:, 2],
                 name="collocation center",
                 mode="markers",
-                line=dict(color=np.arange(len(X_matrix)), colorscale="plasma"),
+                marker=dict(color="gray", size=2),
             ),
             go.Scatter3d(
                 x=b_l[:, 0],
@@ -325,6 +325,7 @@ class Track:
                 z=b_l[:, 2],
                 name="collocation left",
                 mode="markers",
+                marker=dict(color="gray", size=2),
             ),
             go.Scatter3d(
                 x=b_r[:, 0],
@@ -332,6 +333,7 @@ class Track:
                 z=b_r[:, 2],
                 name="collocation right",
                 mode="markers",
+                marker=dict(color="gray", size=2),
             ),
         ], go.Scatter3d(
             x=state[:, 3],
