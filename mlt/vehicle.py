@@ -454,6 +454,8 @@ class Vehicle:
             - self.prop.p_phi(self.prop.s_c) * q_dot[4]) / f
         )
 
+        # self.opti.subject_to(u[0] * u[1] <= 1)
+
         # Positive velocity
         self.opti.subject_to(q_1_dot > 5 / self.track.length)
 
@@ -498,9 +500,16 @@ class Vehicle:
                 F_ref = self.prop.t_Fznom[i]
 
                 self.opti.subject_to(
-                    (f_x[i,j] / (mu_x * F_ref))**2 + (f_y[i,j] / (mu_y * F_ref))**2
-                    <= (f_z_safe / F_ref)**2
+                    ca.sqrt((f_x[i,j] / (mu_x))**2 + (f_y[i,j] / (mu_y))**2 + 1)
+                    <= f_z_safe
                 )
+
+                # F_ref = self.prop.t_Fznom[i]
+
+                # self.opti.subject_to(
+                #     (f_x[i,j] / (mu_x * f_z_safe))**2 + (f_y[i,j] / (mu_y * f_z_safe))**2
+                #     <= 1
+                # )
 
               
 

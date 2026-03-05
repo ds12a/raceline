@@ -126,7 +126,7 @@ class MLTCollocation(PSCollocation):
             else:
                 # Cold start guesses
                 # Velocity
-                v_guess = 20
+                v_guess = 30
                 self.opti.set_initial(Q_1_dot[k][:, :], v_guess / self.track.length)
 
                 # Vertical tire forces
@@ -198,7 +198,7 @@ class MLTCollocation(PSCollocation):
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
-            "ipopt.bound_relax_factor": 1e-6,
+            # "ipopt.bound_relax_factor": 1e-6,
             "ipopt.hessian_approximation": "exact",
             "ipopt.tol": 1e-4,
             # "ipopt.hessian_approximation": "limited-memory",
@@ -254,9 +254,10 @@ class MLTCollocation(PSCollocation):
 
         vel_cost = 1 / ca.sqrt(q_1_dot**2 + 1e-8)
         ab_cost = (u[0] * u[1]) ** 2
-        bang_cost = ca.sumsqr(du[2])
+        steer_bang_cost = ca.sumsqr(du[2])
+        # ab_bang_cost = ca.sumsqr(du[0]) + ca.sumsqr(du[1])
 
-        return vel_cost + k_b * bang_cost + k_f * ab_cost 
+        return vel_cost + k_b * steer_bang_cost
 
     def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
@@ -301,7 +302,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/zandvoort.json",
+        "track": "track_import/generated/track.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
@@ -324,12 +325,12 @@ if __name__ == "__main__":
     # traj.save("mlt/generated/testing.json")
     track = None
 
-    for n in [40]:
+    for n in [90]:
         print(f"{n} segments")
         mlt = MLTCollocation(config)
         mr = MeshRefinement(mlt, r_config)
 
-        track = mlt.iteration(np.linspace(0, 1, n), np.array([5] * (n-1)), track)
+        track = mlt.iteration(np.linspace(0, 1, n), np.array([4] * (n-1)), track)
         track.save("mlt/generated/testing.json")
 
         props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
