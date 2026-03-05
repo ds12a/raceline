@@ -116,7 +116,8 @@ class MLTCollocation(PSCollocation):
             # Initial guesses
             if warm_start is not None:
                 # Use given Trajectory for warm start
-                values = warm_start.linstate(t_tau)
+                values = warm_start.linstate(t_tau * self.track.length)
+
                 self.opti.set_initial(U[k][:, :], values[:, 0:3])
                 self.opti.set_initial(Q[k][:, :], values[:, 3:8])
                 self.opti.set_initial(Z[k][:, :], values[:, 8:12])
@@ -125,7 +126,7 @@ class MLTCollocation(PSCollocation):
             else:
                 # Cold start guesses
                 # Velocity
-                v_guess = 100
+                v_guess = 20
                 self.opti.set_initial(Q_1_dot[k][:, :], v_guess / self.track.length)
 
                 # Vertical tire forces
@@ -197,7 +198,7 @@ class MLTCollocation(PSCollocation):
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
-            # "ipopt.bound_relax_factor": 1e-3,
+            "ipopt.bound_relax_factor": 1e-6,
             "ipopt.hessian_approximation": "exact",
             "ipopt.tol": 1e-4,
             # "ipopt.hessian_approximation": "limited-memory",
@@ -210,10 +211,11 @@ class MLTCollocation(PSCollocation):
             ipopt_settings["ipopt.warm_start_init_point"] = "yes"
             ipopt_settings["ipopt.warm_start_bound_push"] = 1e-6
             ipopt_settings["ipopt.warm_start_mult_bound_push"] = 1e-6
-            ipopt_settings["ipopt.mu_init"] = 1e-6
+            ipopt_settings["ipopt.mu_init"] = 1e-1
 
         # Solve!
         try:
+
             self.opti.solver("ipopt", ipopt_settings)
         except Exception as e:
             if "ipopt.linear_solver" in ipopt_settings:
@@ -236,40 +238,6 @@ class MLTCollocation(PSCollocation):
             stats = sol.stats()
             print(f"Solve iteration failed after {stats['iter_count']} iteration...")
 
-            # g = self.opti.debug.value(self.opti.g)
-            # lbg = self.opti.debug.value(self.opti.lbg)
-            # ubg = self.opti.debug.value(self.opti.ubg)
-            # violation = np.maximum(np.maximum(lbg - g, g - ubg), 0)
-            # print(f"Initial infeasibility: max |g| = {np.max(np.abs(g)):.3e}")
-            # Diagnostics
-            # worst_20 = np.argsort(np.abs(violation))[-200:][::-1]
-            # constraint_names = [
-            #     "fz_implicit_0",
-            #     "fz_implicit_1",
-            #     "fz_implicit_2",
-            #     "fz_implicit_3",
-            #     "ff_torque",
-            #     "road_lat",
-            #     "yaw",
-            #     "vert",
-            #     "pitch",
-            #     "roll",
-            #     "min_speed",
-            #     "power_limit",
-            #     "fxa_pos",
-            #     "fxb_pos",
-            #     "steer_bounds",
-            #     "track_bounds",
-            #     "friction_ellipse_0",
-            #     "friction_ellipse_1",
-            #     "friction_ellipse_2",
-            #     "friction_ellipse_3",
-            # ]
-            # for idx in worst_20:
-            #     local = idx % 20
-            #     point = idx // 20
-            #     print(f"  g[{idx}] = {g[idx]:+.3e}  ->  {constraint_names[local]}  @ point {point}")
-
         print(f"Final cost: {sol.value(J)}")
 
         # Collect solution
@@ -282,13 +250,13 @@ class MLTCollocation(PSCollocation):
         return Trajectory(Q_sol, U_sol, Z_sol, v_sol, t, self.track.length)
 
     @staticmethod
-    def cost(q_1_dot, u, du, k_f=1e-3, k_b=1e-9):
+    def cost(q_1_dot, u, du, k_f=1e-3, k_b=1e-5):
 
         vel_cost = 1 / ca.sqrt(q_1_dot**2 + 1e-8)
         ab_cost = (u[0] * u[1]) ** 2
-        bang_cost = ca.sumsqr(du)
+        bang_cost = ca.sumsqr(du[2])
 
-        return vel_cost + k_f * ab_cost + k_b * bang_cost
+        return vel_cost + k_b * bang_cost + k_f * ab_cost 
 
     def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
@@ -333,7 +301,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/zv_test.json",
+        "track": "track_import/generated/zandvoort.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
@@ -350,43 +318,49 @@ if __name__ == "__main__":
         },
     }
 
-    mlt = MLTCollocation(config)
-    mr = MeshRefinement(mlt, r_config)
+    
 
     # traj = mr.run()
     # traj.save("mlt/generated/testing.json")
+    track = None
 
-    mlt.iteration(np.linspace(0, 1, 10), np.array([20] * 9)).save("mlt/generated/testing.json")
+    for n in [40]:
+        print(f"{n} segments")
+        mlt = MLTCollocation(config)
+        mr = MeshRefinement(mlt, r_config)
 
-    props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
-    traj = Trajectory.load("mlt/generated/testing.json")
+        track = mlt.iteration(np.linspace(0, 1, n), np.array([5] * (n-1)), track)
+        track.save("mlt/generated/testing.json")
 
-    # Visualize
-    fine_plot, _ = mr.colloc.track.plot_uniform(1)
+        props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
+        traj = Trajectory.load("mlt/generated/testing.json")
 
-    traj.plot_collocation()
+        # Visualize
+        fine_plot, _ = mr.colloc.track.plot_uniform(1)
 
-    fig = go.Figure()
+        traj.plot_collocation()
 
-    fig.add_traces(
-        [
-            mr.colloc.track.plot_raceline_colloc(traj),
-            *fine_plot,
-            # foo.track.plot_raceline_uniform(traj),
-            *mr.colloc.track.plot_car_bounds(traj, props.g_t),
-        ]
-    )
-    fig.add_trace(mr.colloc.track.plot_ribbon())
+        fig = go.Figure()
 
-    fig.update_layout(
-        scene=dict(
-            aspectmode="data",
-            xaxis=dict(showbackground=False),
-            yaxis=dict(showbackground=False),
-            zaxis=dict(showbackground=False),
-        ),
-        legend=dict(
-            orientation="h",
-        ),
-    )
-    fig.show()
+        fig.add_traces(
+            [
+                mr.colloc.track.plot_raceline_colloc(traj),
+                *fine_plot,
+                # foo.track.plot_raceline_uniform(traj),
+                *mr.colloc.track.plot_car_bounds(traj, props.g_t),
+            ]
+        )
+        fig.add_trace(mr.colloc.track.plot_ribbon())
+
+        fig.update_layout(
+            scene=dict(
+                aspectmode="data",
+                xaxis=dict(showbackground=False),
+                yaxis=dict(showbackground=False),
+                zaxis=dict(showbackground=False),
+            ),
+            legend=dict(
+                orientation="h",
+            ),
+        )
+        fig.show()

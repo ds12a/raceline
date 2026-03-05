@@ -420,7 +420,11 @@ class Vehicle:
             [[self.prop.t_Fznom[i]] * 2 for i in range(2)]
         )
 
-        self.opti.subject_to(self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) / fz_ref == f_z / fz_ref)
+        # for i in range(2):
+        #     for j in range(2):
+        #         self.opti.subject_to(f_z[i, j] >= 50)
+
+        self.opti.subject_to((self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) - f_z) / fz_ref == 0)
 
         # J_e, _ = self.track.rotation_jacobians(q_1 * self.track.length)
         p = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81 * 10
@@ -433,7 +437,7 @@ class Vehicle:
 
         # Vert
         self.opti.subject_to(
-            torques[8] / f== (-self.prop.p(self.prop.s_k) * q[2] - self.prop.p(self.prop.s_c) * q_dot[2]) / f
+            torques[8] / f == (-self.prop.p(self.prop.s_k) * q[2] - self.prop.p(self.prop.s_c) * q_dot[2]) / f
         )
 
         # Pitch
@@ -497,6 +501,8 @@ class Vehicle:
                     (f_x[i,j] / (mu_x * F_ref))**2 + (f_y[i,j] / (mu_y * F_ref))**2
                     <= (f_z_safe / F_ref)**2
                 )
+
+              
 
     def calculate_freeflyer_config(self, q_1):
         q_1_dot = ca.SX.sym("q_1_dot")
