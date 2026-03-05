@@ -154,9 +154,9 @@ class MLTCollocation(PSCollocation):
                         )
 
                 # q2
-                # self.opti.set_initial(
-                #     Q[k][:, 0], 5 # This shouldn't help but it seems to be helping?
-                # )
+                self.opti.set_initial(
+                    Q[k][:, 0], 5 # This shouldn't help but it seems to be helping?
+                )
 
                 # q4
                 self.opti.set_initial(
