@@ -378,7 +378,6 @@ class Vehicle:
         v_3 = self.cdata.v[self.yaw_id].vector
 
         f_ext = [cpin.Force.Zero() for _ in range(self.model.njoints)]
-        # print("njoints", self.model.njoints)
 
         f_3x, f_3y, m_3z = ca.vertsplit(self.w3e_func(f_z, u, v_3))
         f_xa, f_za, m_ya = ca.vertsplit(self.w6_func(v_3))
@@ -391,7 +390,6 @@ class Vehicle:
 
         ff_torque = ca.dot(J_t, torques[:6])
 
-        # TODO check these indicies!
         self.rnea_func = ca.Function(
             "rnea",
             [q, v, a, f_z, u, J_t],
@@ -419,10 +417,6 @@ class Vehicle:
         fz_ref = Vehicle._2d_list_to_SX(
             [[self.prop.t_Fznom[i]] * 2 for i in range(2)]
         )
-
-        # for i in range(2):
-        #     for j in range(2):
-        #         self.opti.subject_to(f_z[i, j] >= 50)
 
         self.opti.subject_to((self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) - f_z) / fz_ref == 0)
 
@@ -463,8 +457,8 @@ class Vehicle:
         self.opti.subject_to(u[0] * v_3x / self.prop.e_max <= 1)
 
         # Control bounds
-        self.opti.subject_to(u[0] >= 0)
-        self.opti.subject_to(u[1] >= 0)
+        # self.opti.subject_to(u[0] >= 0)
+        # self.opti.subject_to(u[1] >= 0)
         self.opti.subject_to(self.opti.bounded(-self.prop.g_steer_max, u[2], self.prop.g_steer_max))
 
         # Track bounds
@@ -497,19 +491,17 @@ class Vehicle:
                     + self.prop.t_Dy2[i] * (f_z_safe - self.prop.t_Fznom[i]) / self.prop.t_Fznom[i]
                 )
 
-                F_ref = self.prop.t_Fznom[i]
-
                 self.opti.subject_to(
                     ca.sqrt((f_x[i,j] / (mu_x))**2 + (f_y[i,j] / (mu_y))**2 + 1)
                     <= f_z_safe
                 )
 
-                # F_ref = self.prop.t_Fznom[i]
-
                 # self.opti.subject_to(
                 #     (f_x[i,j] / (mu_x * f_z_safe))**2 + (f_y[i,j] / (mu_y * f_z_safe))**2
                 #     <= 1
                 # )
+
+
 
               
 

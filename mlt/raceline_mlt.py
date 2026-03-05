@@ -14,7 +14,7 @@ import plotly.express as px
 class MLTCollocation(PSCollocation):
 
     n_q: int = 5
-    n_u: int = 3
+    n_u: int = 2
     n_z: int = 4
 
     def __init__(self, config: dict):
@@ -92,6 +92,10 @@ class MLTCollocation(PSCollocation):
 
             # Collocation constraints (enforces dynamics on X)
             for i, q_1 in enumerate(t_tau[:-1]):
+                fx = U[k][i, 0]
+                fxa = (fx + ca.sqrt(fx**2 + 1)) / 2
+                fxb = (-fx + ca.sqrt(fx**2 + 1)) / 2
+                u = ca.vertcat(fxa, fxb, U[k][i, 1])
 
                 self.vehicle.set_constraints(
                     q_1,
@@ -101,7 +105,7 @@ class MLTCollocation(PSCollocation):
                     Q_ddot[k][i, :],
                     Q[k][i, :],
                     Z[k][i, :],
-                    U[k][i, :],
+                    u,
                 )
 
             # Quadrature cost
@@ -118,10 +122,10 @@ class MLTCollocation(PSCollocation):
                 # Use given Trajectory for warm start
                 values = warm_start.linstate(t_tau * self.track.length)
 
-                self.opti.set_initial(U[k][:, :], values[:, 0:3])
-                self.opti.set_initial(Q[k][:, :], values[:, 3:8])
-                self.opti.set_initial(Z[k][:, :], values[:, 8:12])
-                self.opti.set_initial(Q_1_dot[k][:, :], values[:, 12] / self.track.length)
+                self.opti.set_initial(U[k][:, :], values[:, 0:2])
+                self.opti.set_initial(Q[k][:, :], values[:, 2:7])
+                self.opti.set_initial(Z[k][:, :], values[:, 7:11])
+                self.opti.set_initial(Q_1_dot[k][:, :], values[:, 11] / self.track.length)
 
             else:
                 # Cold start guesses
@@ -149,6 +153,11 @@ class MLTCollocation(PSCollocation):
                             ),
                         )
 
+                # q2
+                # self.opti.set_initial(
+                #     Q[k][:, 0], 5 # This shouldn't help but it seems to be helping?
+                # )
+
                 # q4
                 self.opti.set_initial(
                     Q[k][:, 2],
@@ -160,7 +169,6 @@ class MLTCollocation(PSCollocation):
                 # Fxa equal with initial drag
                 self.opti.set_initial(
                     U[k][:, 0],
-                    # self.vehicle.prop.e_max / v_guess,
                     0.5
                     * self.vehicle.env.rho
                     * self.vehicle.prop.g_S
@@ -176,9 +184,9 @@ class MLTCollocation(PSCollocation):
 
                 curvature[b[:, 2] < 0] *= -1
                 wheelbase = sum(self.vehicle.prop.g_a)
-                delta_guess = np.atan(wheelbase * curvature)
+                delta_guess = np.atan(wheelbase * curvature) + 0.05 # FIXME why does this improve convergence??????
 
-                self.opti.set_initial(U[k][:, 2], delta_guess)
+                self.opti.set_initial(U[k][:, 1], delta_guess)
 
         # Periodicity
         self.opti.subject_to(Q[-1][-1, :] == Q[0][0, :])
@@ -190,7 +198,7 @@ class MLTCollocation(PSCollocation):
         self.opti.minimize(J)
 
         ipopt_settings = {
-            "ipopt.print_frequency_iter": 50,
+            "ipopt.print_frequency_iter": 25,
             "print_time": 0,
             "ipopt.sb": "no",
             "ipopt.max_iter": 3000,
@@ -198,7 +206,7 @@ class MLTCollocation(PSCollocation):
             "ipopt.linear_solver": "ma97",
             "ipopt.mu_strategy": "adaptive",
             "ipopt.nlp_scaling_method": "gradient-based",
-            # "ipopt.bound_relax_factor": 1e-6,
+            "ipopt.bound_relax_factor": 1e-6,
             "ipopt.hessian_approximation": "exact",
             "ipopt.tol": 1e-4,
             # "ipopt.hessian_approximation": "limited-memory",
@@ -215,7 +223,6 @@ class MLTCollocation(PSCollocation):
 
         # Solve!
         try:
-
             self.opti.solver("ipopt", ipopt_settings)
         except Exception as e:
             if "ipopt.linear_solver" in ipopt_settings:
@@ -253,8 +260,8 @@ class MLTCollocation(PSCollocation):
     def cost(q_1_dot, u, du, k_f=1e-3, k_b=1e-5):
 
         vel_cost = 1 / ca.sqrt(q_1_dot**2 + 1e-8)
-        ab_cost = (u[0] * u[1]) ** 2
-        steer_bang_cost = ca.sumsqr(du[2])
+        # ab_cost = (u[0] * u[1]) ** 2
+        steer_bang_cost = ca.sumsqr(du[1])
         # ab_bang_cost = ca.sumsqr(du[0]) + ca.sumsqr(du[1])
 
         return vel_cost + k_b * steer_bang_cost
@@ -302,7 +309,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/track.json",
+        "track": "track_import/generated/COTA.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
@@ -319,18 +326,17 @@ if __name__ == "__main__":
         },
     }
 
-    
-
     # traj = mr.run()
     # traj.save("mlt/generated/testing.json")
     track = None
-
+    # zandvoort 90 4
+    # 120 fails to solve but almost converges
     for n in [90]:
         print(f"{n} segments")
         mlt = MLTCollocation(config)
         mr = MeshRefinement(mlt, r_config)
 
-        track = mlt.iteration(np.linspace(0, 1, n), np.array([4] * (n-1)), track)
+        track = mlt.iteration(np.linspace(0, 1, n), np.array([4] * (n - 1)), track)
         track.save("mlt/generated/testing.json")
 
         props = VehicleProperties.load_yaml("mlt/vehicle_properties/DallaraAV24.yaml")
