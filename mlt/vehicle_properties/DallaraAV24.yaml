@@ -8,11 +8,11 @@ m_unsprung: 40 # Unsprung mass
 
 # Inertia properties
 i_xx: 550 # Roll inertia
-i_yy: 800 # Pitch inertia
-i_zz: 265 # Yaw inertia
+i_yy: 265 # Pitch inertia
+i_zz: 800 # Yaw inertia
 
 # Geometry properties
-g_com_h: 0.2 # COM height
+g_com_h: 0.2 # 0.2 # COM height
 g_a: [1.7, 1.3] # Axles to COM [front, rear]
 g_t: [1.676, 1.58] # Track widths [front, rear]
 g_S: 1 # Frontal area

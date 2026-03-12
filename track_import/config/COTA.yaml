@@ -30,8 +30,8 @@ track_fitting:
     w_phi: 1.0e+7
 
     # Boundary Noise weights
-    w_n_l: 2.0e+3
-    w_n_r: 2.0e+3
+    w_n_l: 2.0e+7
+    w_n_r: 2.0e+7
 
   # Mesh refinement options
   refinement:

@@ -184,7 +184,7 @@ class MLTCollocation(PSCollocation):
 
                 curvature[b[:, 2] < 0] *= -1
                 wheelbase = sum(self.vehicle.prop.g_a)
-                delta_guess = np.atan(wheelbase * curvature) + 0.05 # FIXME why does this improve convergence??????
+                delta_guess = np.atan(wheelbase * curvature)
 
                 self.opti.set_initial(U[k][:, 1], delta_guess)
 
@@ -358,6 +358,19 @@ if __name__ == "__main__":
             ]
         )
         fig.add_trace(mr.colloc.track.plot_ribbon())
+
+        fig.update_layout(
+            scene=dict(
+                # aspectmode="data",
+                xaxis=dict(showbackground=False),
+                yaxis=dict(showbackground=False),
+                zaxis=dict(showbackground=False),
+            ),
+            legend=dict(
+                orientation="h",
+            ),
+        )
+        fig.show()
 
         fig.update_layout(
             scene=dict(

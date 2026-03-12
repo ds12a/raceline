@@ -421,7 +421,7 @@ class Vehicle:
         self.opti.subject_to((self.f_z_func(f_z, u, v_3, f_3z, m_3x, m_3y, m_ya) - f_z) / fz_ref == 0)
 
         # J_e, _ = self.track.rotation_jacobians(q_1 * self.track.length)
-        p = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81 * 10
+        p = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81 * self.track.length
         f = (self.prop.m_sprung + self.prop.m_unsprung) * 9.81
 
         self.opti.subject_to(ff_torque / p == 0)  # TODO check math here and see if necessary
@@ -492,7 +492,7 @@ class Vehicle:
                 )
 
                 self.opti.subject_to(
-                    ca.sqrt((f_x[i,j] / (mu_x))**2 + (f_y[i,j] / (mu_y))**2 + 1)
+                    ca.sqrt((f_x[i,j] / (mu_x))**2 + (f_y[i,j] / (mu_y))**2)
                     <= f_z_safe
                 )
 

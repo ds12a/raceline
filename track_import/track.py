@@ -40,6 +40,9 @@ class Track:
             tau = np.asarray([-1] + list(tau) + [1])
             self.colloc_t.extend(self.tau_to_t(tau, k))
 
+            # X[k][:, 2] = 0
+            # Q[k][:, 2] = 0
+
             self.poly.append(
                 scipy.interpolate.BarycentricInterpolator(tau, np.column_stack([X[k], Q[k]]))
             )
@@ -104,7 +107,7 @@ class Track:
         state = self.state(np.array([s]))[0]
         state_ds = self.der_state(np.array([s]), n=1)[0]
 
-        R = pin.rpy.rpyToMatrix(*state[3:6][::-1])  # We store in zyx (yaw, pitch, roll)
+        # R = pin.rpy.rpyToMatrix(*state[3:6][::-1])  # We store in zyx (yaw, pitch, roll)
 
         # Calculates v (track velocity) and a (track accel)
         theta, mu, phi = state[3:6]
@@ -449,7 +452,7 @@ class Track:
 
         width = max(g_t) / 2
 
-        r += np.array([0, 0, 0.1])
+        # r += np.array([0, 0, 0.1])
         l_track = r + n_v * width
         r_track = r - n_v * width
 
