@@ -50,10 +50,10 @@ class MLTCollocation(PSCollocation):
             # Generates CasADi variables at collocation points
             if k == 0:
                 Q.append(self.opti.variable(N[k] + 2, self.n_q))
-                dQ.append(self.opti.variable(N[k] + 2, self.n_q))
-                ddQ.append(self.opti.variable(N[k] + 2, self.n_q))
+                # dQ.append(self.opti.variable(N[k] + 2, self.n_q))
+                # ddQ.append(self.opti.variable(N[k] + 2, self.n_q))
                 Q_1_dot.append(self.opti.variable(N[k] + 2, 1))
-                Q_1_ddot.append(self.opti.variable(N[k] + 2, 1))
+                # Q_1_ddot.append(self.opti.variable(N[k] + 2, 1))
 
                 U.append(self.opti.variable(N[k] + 2, self.n_u))
                 Z.append(self.opti.variable(N[k] + 2, self.n_z))
@@ -62,15 +62,18 @@ class MLTCollocation(PSCollocation):
                 # Explicitly couples last of previous segment with first of current segment
                 # by setting them as the same variable
                 Q.append(ca.vertcat(Q[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
-                dQ.append(ca.vertcat(dQ[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
-                ddQ.append(ca.vertcat(ddQ[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
+                # dQ.append(ca.vertcat(dQ[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
+                # ddQ.append(ca.vertcat(ddQ[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_q)))
 
                 Q_1_dot.append(ca.vertcat(Q_1_dot[k - 1][-1, :], self.opti.variable(N[k] + 1, 1)))
-                Q_1_ddot.append(ca.vertcat(Q_1_ddot[k - 1][-1, :], self.opti.variable(N[k] + 1, 1)))
+                # Q_1_ddot.append(ca.vertcat(Q_1_ddot[k - 1][-1, :], self.opti.variable(N[k] + 1, 1)))
 
                 U.append(ca.vertcat(U[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_u)))
                 Z.append(ca.vertcat(Z[k - 1][-1, :], self.opti.variable(N[k] + 1, self.n_z)))
 
+            dQ.append(self.opti.variable(N[k] + 2, self.n_q))
+            ddQ.append(self.opti.variable(N[k] + 2, self.n_q))
+            Q_1_ddot.append(self.opti.variable(N[k] + 2, 1))
             # Q.append(self.opti.variable(N[k] + 2, self.n_q))
             # Q_1_dot.append(self.opti.variable(N[k] + 2, 1))
             # U.append(self.opti.variable(N[k] + 2, self.n_u))
@@ -95,16 +98,16 @@ class MLTCollocation(PSCollocation):
 
             # der_scale = (2 / (t[k + 1] - t[k]))
 
-            self.opti.subject_to(norm_factor * dQ[k][:-1, :] == ca.mtimes(D, Q[k])[:-1, :])
-            self.opti.subject_to(norm_factor * ddQ[k][:-1, :] == ca.mtimes(D, dQ[k])[:-1, :])
-            self.opti.subject_to(norm_factor * Q_1_ddot[k][:-1, :] == ca.mtimes(D, Q_1_dot[k])[:-1, :] * Q_1_dot[k][:-1, :])
+            self.opti.subject_to(norm_factor * dQ[k] == ca.mtimes(D, Q[k]))
+            self.opti.subject_to(norm_factor * ddQ[k] == ca.mtimes(D, dQ[k]))
+            self.opti.subject_to(norm_factor * Q_1_ddot[k] == ca.mtimes(D, Q_1_dot[k]) * Q_1_dot[k])
 
             Q_dot.append(dQ[k] * Q_1_dot[k])
             Q_ddot.append(ddQ[k] * Q_1_dot[k] ** 2 + dQ[k] * Q_1_ddot[k])
 
             # Continuity constraints
-            # if k != 0:
-            #     self.opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
+            if k != 0:
+                self.opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
 
             # Collocation constraints (enforces dynamics on X)
             for i, q_1 in enumerate(t_tau[:-1]):
@@ -281,7 +284,7 @@ class MLTCollocation(PSCollocation):
         steer_bang_cost = ca.sumsqr(du[1])
         # ab_bang_cost = ca.sumsqr(du[0]) + ca.sumsqr(du[1])
 
-        return vel_cost + k_b * steer_bang_cost
+        return vel_cost + steer_bang_cost * k_b
 
     def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
@@ -326,7 +329,8 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/cota_test.json",
+        # "track": "track_import/generated/track.json",
+        "track": "foo.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
