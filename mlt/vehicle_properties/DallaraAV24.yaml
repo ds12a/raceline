@@ -7,8 +7,8 @@ m_sprung: 750 # Sprung mass
 m_unsprung: 40 # Unsprung mass
 
 # Inertia properties
-i_xx: 550 # Roll inertia
-i_yy: 265 # Pitch inertia
+i_xx: 265 # Roll inertia
+i_yy: 550 # Pitch inertia
 i_zz: 800 # Yaw inertia
 
 # Geometry properties

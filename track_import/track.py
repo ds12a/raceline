@@ -414,7 +414,7 @@ class Track:
         """
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         ss = trajectory.state(s)
-        r = self.raceline(s, ss[:, 2])
+        r = self.raceline(s, ss[:, 3])
 
         return go.Scatter3d(
             x=r[:, 0],
@@ -437,9 +437,9 @@ class Track:
     def plot_car_bounds(self, trajectory: Trajectory, g_t, approx_spacing=0.1):
         s = np.linspace(0, self.length, int(self.length // approx_spacing))
         ss = trajectory.state(s)
-        heading_angle = ss[:, 3]
+        heading_angle = ss[:, 4]
 
-        r = self.raceline(s, ss[:, 2])
+        r = self.raceline(s, ss[:, 3])
         t, _, b = self.tnb(s)
 
         # calculation of heading vec for car
@@ -506,7 +506,7 @@ class Track:
 
         r = self.raceline(
             trajectory.colloc_t,
-            trajectory.state(trajectory.colloc_t)[:, 2],
+            trajectory.state(trajectory.colloc_t)[:, 3],
         )
 
 

@@ -14,7 +14,7 @@ import plotly.express as px
 class MLTCollocation(PSCollocation):
 
     n_q: int = 5
-    n_u: int = 2
+    n_u: int = 3
     n_z: int = 4
 
     def __init__(self, config: dict):
@@ -92,11 +92,6 @@ class MLTCollocation(PSCollocation):
 
             # Collocation constraints (enforces dynamics on X)
             for i, q_1 in enumerate(t_tau[:-1]):
-                fx = U[k][i, 0]
-                fxa = (fx + ca.sqrt(fx**2 + 1)) / 2
-                fxb = (-fx + ca.sqrt(fx**2 + 1)) / 2
-                u = ca.vertcat(fxa, fxb, U[k][i, 1])
-
                 self.vehicle.set_constraints(
                     q_1,
                     Q_1_dot[k][i, :],
@@ -105,7 +100,7 @@ class MLTCollocation(PSCollocation):
                     Q_ddot[k][i, :],
                     Q[k][i, :],
                     Z[k][i, :],
-                    u,
+                    U[k][i, :],
                 )
 
             # Quadrature cost
@@ -122,10 +117,10 @@ class MLTCollocation(PSCollocation):
                 # Use given Trajectory for warm start
                 values = warm_start.linstate(t_tau * self.track.length)
 
-                self.opti.set_initial(U[k][:, :], values[:, 0:2])
-                self.opti.set_initial(Q[k][:, :], values[:, 2:7])
-                self.opti.set_initial(Z[k][:, :], values[:, 7:11])
-                self.opti.set_initial(Q_1_dot[k][:, :], values[:, 11] / self.track.length)
+                self.opti.set_initial(U[k][:, :], values[:, 0:3])
+                self.opti.set_initial(Q[k][:, :], values[:, 3:8])
+                self.opti.set_initial(Z[k][:, :], values[:, 8:12])
+                self.opti.set_initial(Q_1_dot[k][:, :], values[:, 12] / self.track.length)
 
             else:
                 # Cold start guesses
@@ -186,7 +181,7 @@ class MLTCollocation(PSCollocation):
                 wheelbase = sum(self.vehicle.prop.g_a)
                 delta_guess = np.atan(wheelbase * curvature)
 
-                self.opti.set_initial(U[k][:, 1], delta_guess)
+                self.opti.set_initial(U[k][:, 2], delta_guess)
 
         # Periodicity
         self.opti.subject_to(Q[-1][-1, :] == Q[0][0, :])
@@ -257,14 +252,14 @@ class MLTCollocation(PSCollocation):
         return Trajectory(Q_sol, U_sol, Z_sol, v_sol, t, self.track.length)
 
     @staticmethod
-    def cost(q_1_dot, u, du, k_f=1e-3, k_b=1e-5):
+    def cost(q_1_dot, u, du, k_f=1e-3, k_b=1e-3):
 
         vel_cost = 1 / ca.sqrt(q_1_dot**2 + 1e-8)
         # ab_cost = (u[0] * u[1]) ** 2
-        steer_bang_cost = ca.sumsqr(du[1])
+        steer_bang_cost = ca.sumsqr(du[2])
         # ab_bang_cost = ca.sumsqr(du[0]) + ca.sumsqr(du[1])
 
-        return vel_cost + k_b * steer_bang_cost
+        return vel_cost + k_b * steer_bang_cost #+ k_f * (u[0] * u[1])**2
 
     def sample_cost(self, traj: Trajectory, points: np.ndarray) -> tuple[np.ndarray, float]:
         """
@@ -309,7 +304,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/COTA.json",
+        "track": "track_import/generated/track.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {

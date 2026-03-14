@@ -36,7 +36,7 @@ class Trajectory:
         self.colloc_t = []              # all collocation times
 
         # List of the interpolated polynomial over each interval
-        # [fx, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
+        # [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
         self.poly = []
 
         for k in range(len(Q)):
@@ -63,7 +63,7 @@ class Trajectory:
             s (np.ndarray): Array of arc length parameters
 
         Returns:
-            np.ndarray: Array whose columns are [fx, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
+            np.ndarray: Array whose columns are [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
         """
         return self.state(s)
 
@@ -79,7 +79,7 @@ class Trajectory:
             s (np.ndarray): Array of arc length parameters
 
         Returns:
-            np.ndarray: Array containing states [fx, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
+            np.ndarray: Array containing states [fxa, fxb, delta, q2, q3, q4, q5, q6, fz11, fz12, fz21, fz22, v]
                         for each given arc length parameter
         """
         s = s % self.length
@@ -115,7 +115,8 @@ class Trajectory:
         )
 
         params = [  # surely better way to do this right
-            "fx",
+            "fxa",
+            "fxb",
             "delta",
             "q2",
             "q3",
