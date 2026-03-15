@@ -1,4 +1,5 @@
 # Raceline
+![](assets/zandvoort.png)
 
 A repository containing tools to generate a smooth and periodic racetrack from boundary points measured with noisy GPS or other methods. This code employs the CasADi Opti framework to formulate and solve an Optimal Control Problem.
 # In the Future
