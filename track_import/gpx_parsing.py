@@ -196,6 +196,8 @@ def read_gpx_splines(source):
     track[2] = np.asarray(track[2])
 
     # Set origin to be first center point
+    print(f"Setting to origin: {track[2][:, 0]} - {trm.transform(track[2][:, 0][0], track[2][:, 0][1], direction='INVERSE')}")
+    
     for i, t in enumerate(track):
         track[i] = (t.T - track[2][:, 0]).T
 
