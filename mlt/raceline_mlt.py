@@ -320,7 +320,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/track.json",
+        "track": "track_import/generated/circle.json",
         # "track": "foo.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     track = None
     # zandvoort 90 4
     # 120 fails to solve but almost converges
-    for n in [100]:
+    for n in [150]:
         print(f"{n} segments")
         mlt = MLTCollocation(config)
         mr = MeshRefinement(mlt, r_config)
