@@ -20,25 +20,25 @@ track_fitting:
   # Configurable weights for cost function
   cost_weights:
     # Boundary Adherence weights (center, left, right)
-    w_c: 5.0e-3
-    w_l: 2.0e-2
-    w_r: 2.0e-2
+    w_c: 5.0e-5
+    w_l: 2.0e-15
+    w_r: 2.0e-15
 
     # Euler Angle Curvature weights
-    w_theta: 5.0e+2
-    w_mu: 1.0e+7
-    w_phi: 1.0e+7
+    w_theta: 1.0e+11
+    w_mu: 1.0e+11
+    w_phi: 1.0e+11
 
     # Boundary Noise weights
-    w_n_l: 2.0e+3
-    w_n_r: 2.0e+3
+    w_n_l: 2.0e+4
+    w_n_r: 2.0e+4
 
   # Mesh refinement options
   refinement:
     # Basic refinement configs
-    initial_collocation: 8 # Number of collocation points per segment initially
-    initial_mesh_points: 15 # Number of mesh points initially
-    refinement_steps: 8 # Number of refinement steps to perform
+    initial_collocation: 10 # Number of collocation points per segment initially
+    initial_mesh_points: 10 # Number of mesh points initially
+    refinement_steps: 0 # Number of refinement steps to perform
 
     # Lower level parameters relating to the mesh refinement process
     config:

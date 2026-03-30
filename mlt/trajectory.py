@@ -46,6 +46,7 @@ class Trajectory:
             tau = np.asarray([-1] + list(tau) + [1])
             self.colloc_t.extend(self.tau_to_t(tau, k))       # misses last element but thats probably fine
 
+            # print (U[k].shape, Q[k].shape, self.Z[k].shape, self.v[k].shape)
             self.poly.append(
                 scipy.interpolate.BarycentricInterpolator(
                     tau, np.column_stack([U[k], Q[k], self.Z[k], self.v[k]])
