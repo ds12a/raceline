@@ -198,7 +198,7 @@ class MLTCollocation(PSCollocation):
 
         # Periodicity
         # self.opti.subject_to(Q[-1][-1, :] == Q[0][0, :])
-        # self.opti.subject_to(dQ[-1][-1, :] == dQ[0][0, :])
+        self.opti.subject_to(dQ[-1][-1, :] == dQ[0][0, :])
         # self.opti.subject_to(Q_1_dot[-1][-1, :] == Q_1_dot[0][0, :])
         # self.opti.subject_to(Q_1_ddot[-1][-1, :] == Q_1_ddot[0][0, :])
         # self.opti.subject_to(Z[-1][-1, :] == Z[0][0, :])
@@ -320,8 +320,8 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        "track": "track_import/generated/circle.json",
-        # "track": "foo.json",
+        # "track": "track_import/generated/circle.json",
+        "track": "foo.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
     r_config = {
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     track = None
     # zandvoort 90 4
     # 120 fails to solve but almost converges
-    for n in [150]:
+    for n in [120]:
         print(f"{n} segments")
         mlt = MLTCollocation(config)
         mr = MeshRefinement(mlt, r_config)

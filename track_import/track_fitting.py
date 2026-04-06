@@ -117,20 +117,28 @@ def fit_iteration(
         # Generates X and Q matrices + derivatives for this segment
         if k == 0:
             Q.append(opti.variable(N[k] + 2, n_q))
+            dQ.append(opti.variable(N[k] + 2, n_q))
             X.append(opti.variable(N[k] + 2, n_x))
+        elif k == K - 1:
+            Q.append(vertcat(Q[k - 1][-1, :], opti.variable(N[k] + 1, n_q)))
+            dQ.append(vertcat(dQ[k - 1][-1, :], opti.variable(N[k], n_q), dQ[0][0, :]))
+            X.append(vertcat(X[k - 1][-1, :], opti.variable(N[k], n_x), X[0][0, :]))
         else:
             # Explicitly couples last of previous segment with first of current segment
             # by setting them as the same variable
             Q.append(vertcat(Q[k - 1][-1, :], opti.variable(N[k] + 1, n_q)))
+            dQ.append(vertcat(dQ[k - 1][-1, :], opti.variable(N[k] + 1, n_q)))
             X.append(vertcat(X[k - 1][-1, :], opti.variable(N[k] + 1, n_x)))
 
-        dQ.append((2 / (t[k + 1] - t[k])) * mtimes(D, Q[k]))
+        # dQ.append((2 / (t[k + 1] - t[k])) * mtimes(D, Q[k]))
         ddQ.append(2 / (t[k + 1] - t[k]) * mtimes(D, dQ[k]))
         dX.append((2 / (t[k + 1] - t[k])) * mtimes(D, X[k]))
 
+        opti.subject_to(norm_factor * dQ[k] == mtimes(D, Q[k]))
+
         # Continuity constraints
         if k != 0:
-            opti.subject_to(dQ[k - 1][-1, :] == dQ[k][0, :])
+            opti.subject_to(ddQ[k - 1][-1, :] == ddQ[k][0, :])
             # opti.subject_to(Q[k - 1][-1, :] == Q[k][0, :])
 
         # Collocation constraints (enforces dynamics on X)
@@ -209,11 +217,12 @@ def fit_iteration(
     #     opti.subject_to(X[0][0, i] == x0[i])
 
     # Periodicity
-    opti.subject_to(X[-1][-1, :] == X[0][0, :])
+    # opti.subject_to(X[-1][-1, :] == X[0][0, :])
 
     opti.subject_to(Q[-1][-1, 0] == Q[0][0, 0] + 2 * pi * (1 if ccw else -1))
     opti.subject_to(Q[-1][-1, 1:] == Q[0][0, 1:])
-    opti.subject_to(dQ[-1][-1, 1:] == dQ[0][0, 1:])
+    # opti.subject_to(dQ[-1][-1, 1:] == dQ[0][0, 1:])
+    opti.subject_to(ddQ[k - 1][-1, :] == ddQ[k][0, :])
 
     # Optimize!
     opti.minimize(J)
