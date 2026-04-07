@@ -1,9 +1,10 @@
 # Raceline
 ![](assets/zandvoort.png)
 
-A repository containing tools to generate a smooth and periodic racetrack from boundary points measured with noisy GPS or other methods. This code employs the CasADi Opti framework to formulate and solve an Optimal Control Problem.
-# In the Future
-Generation of high-fideltiy minimum-time trajectories (racing lines) around racetrack models
+This repository contains:
+1. A track fitting tool that generates a smooth and periodic racetrack from boundary points measured with noisy GPS or other methods. We formulate this as an Optimal Control Problem with CasADi.
+2. A Lie physics-based minimum-lap-time optimizer to generate optimal raceline trajectories around any track. (In Development!)
+
 # Track Generation Details
 This repository implements, with some modifications, the track-fitting algorithm described in Peratoni and Limebeer's paper. Given two sets of noisy GPS boundary points, we fit a 3D smooth and differentiable ribbon model to the data that is suitable for use with minimum lap time optimization and other autonomous racing related algorithms.
 
@@ -45,8 +46,15 @@ We only provide instructions for QGIS.
 
 Note that, if you cannot obtain access to Opentopography, GPS visualizer is another good free software that can directly convert ```.kml``` and ```.kmz``` files to ```.gpx`` and inject elevation data. However, the accuracy of Opentopography DEMs is much higher, so we prefer to use QGIS.
 
-# Implementation
-We employ a custom modified version of pseudospectral collocation with hp-adaptive mesh refinement as described in Darby's dissertation. More details to come later.
+## Implementation
+We employ a custom modified version of Orthogonal Collocation with finite elements with hp-adaptive mesh refinement as described in Darby's dissertation. More details to come later.
+
+# Minimum Lap Time Optimizer
+We implement a Lie-based physics formulation based on the work of Bartali et al. using the Pinocchio Rigid Body Dynamics library. We model the race vehicle as a 6-DoF end effector, and compute all vehicle dynamics as wrenches to be applied to various joints of the vehicle. We opt to use the Recursive Newton-Euler Algorithm rather than the Articulated Body Algorithm (as used by Bartali et al.) for this project.
+
+Vehicle information is stored in ```.yaml``` files in ```mlt/vehicle_properties```. Note that Pacejka tyre parameters are necessary for this optimizer. Dallara AV21/24 values from the Autonoma AWSIM project for the Indy Autonomous Challenge are currently provided as the default configuration.
+
+**More general + usage documentation will be provided in the future; the optimizer formulation is still a work in progress.**
 
 # References
 ```
@@ -57,4 +65,7 @@ Systems, Measurement, and Control, 137(5):051018, 2015.
 ```
 C. L. Darby, "Hp-Pseudospectral Method for Solving Continuous-Time Nonlinear Optimal
  Control Problems." Order No. 3467615, University of Florida, United States -- Florida, 2011.
+```
+```
+Bartali, L., Gabiccini, M., Grabovic, E. et al. A reduced-order lie group-based race car model for systematic trajectory optimization on 3D tracks. Meccanica 58, 1869–1883 (2023). https://doi.org/10.1007/s11012-023-01708-8
 ```
