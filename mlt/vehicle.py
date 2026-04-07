@@ -108,6 +108,7 @@ class Vehicle:
         # Initializing numeric model
         self.model = pin.Model()
         self._init_pin_tree()
+        self.data = self.model.createData()
 
         # Initializes symbolic CasADi modules
         self.opti = opti
@@ -119,6 +120,7 @@ class Vehicle:
         self._init_w6_func()
         self._init_fz_func()
         self._init_rnea_func()
+        self._init_fk_wrapper()
 
     @staticmethod
     def _2d_list_to_SX(l: list):
@@ -368,19 +370,26 @@ class Vehicle:
         v = ca.SX.sym("v", 11)
         a = ca.SX.sym("a", 11)
 
-        f_z = ca.SX.sym("f_z", 2, 2)
-        u = ca.SX.sym("u", 3)
+        # f_z = ca.SX.sym("f_z", 2, 2)
+        # u = ca.SX.sym("u", 3)
 
         J_t = ca.SX.sym("J_t", 6)
 
-        cpin.forwardKinematics(self.cmodel, self.cdata, q, v)
+        # cpin.forwardKinematics(self.cmodel, self.cdata, q, v)
 
-        v_3 = self.cdata.v[self.yaw_id].vector
+        # v_3 = self.cdata.v[self.yaw_id].vector
+        # v_3 = 
 
         f_ext = [cpin.Force.Zero() for _ in range(self.model.njoints)]
 
-        f_3x, f_3y, m_3z = ca.vertsplit(self.w3e_func(f_z, u, v_3))
-        f_xa, f_za, m_ya = ca.vertsplit(self.w6_func(v_3))
+        # f_3x, f_3y, m_3z = ca.vertsplit(self.w3e_func(f_z, u, v_3))
+        # f_xa, f_za, m_ya = ca.vertsplit(self.w6_func(v_3))
+
+        w3e = ca.SX.sym("w3e", 3)
+        w6 = ca.SX.sym("w6", 3)
+
+        f_3x, f_3y, m_3z = ca.vertsplit(w3e)
+        f_xa, f_za, m_ya = ca.vertsplit(w6)
 
         # TODO Check these indicies
         f_ext[3] = cpin.Force(ca.vertcat(f_3x, f_3y, 0), ca.vertcat(0, 0, m_3z))
@@ -392,27 +401,61 @@ class Vehicle:
 
         self.rnea_func = ca.Function(
             "rnea",
-            [q, v, a, f_z, u, J_t],
+            # [q, v, a, f_z, u, J_t],
+            [q, v, a, J_t, w3e, w6],
             [
                 torques,
                 ff_torque,
-                v_3,
+                # v_3,
                 self.cdata.f[3].linear[2],
                 self.cdata.f[3].angular[0],
                 self.cdata.f[3].angular[1],
             ],
         )
 
+    def _init_fk_wrapper(self):
+        q_out = ca.SX.sym("q", 12)
+        v = ca.SX.sym("v", 11)
+        cpin.forwardKinematics(self.cmodel, self.cdata, q_out, v)
+        v_3 = self.cdata.v[self.yaw_id].vector
+
+        self.fk_func = ca.Function("fk", [q_out, v], [v_3])
+        
     def set_constraints(self, q_1, q_1_dot, q_1_ddot, q_dot, q_ddot, q, f_z, u):
 
         ff_conf, J_t = self.calculate_freeflyer_config(q_1)
         q_out, v, a = ff_conf(q_1_dot, q_1_ddot, q, q_dot, q_ddot)
         f_z = f_z.reshape((2, 2))
-        torques, ff_torque, v_3, f_3z, m_3x, m_3y = self.rnea_func(q_out, v, a, f_z, u, ca.DM(J_t))
+
+        # cpin.forwardKinematics(self.cmodel, self.cdata, q_out, v)
+        v_3 = self.fk_func(q_out, v) # self.cdata.v[self.yaw_id].vector
+        
+        w3e = self.opti.variable(3)
+        w6 = self.opti.variable(3)
+        
+        self.opti.subject_to(self.w3e_func(f_z, u, v_3) == w3e)
+        self.opti.subject_to(self.w6_func(v_3) == w6)
+
+        torques = self.opti.variable(11)
+        ff_torque = self.opti.variable()
+        f_3z = self.opti.variable()
+        m_3x = self.opti.variable()
+        m_3y = self.opti.variable()
+
+        torques_G, ff_torque_G, f_3z_G, m_3x_G, m_3y_G = self.rnea_func(q_out, v, a, ca.DM(J_t), w3e, w6)
+        
+        self.opti.subject_to(torques == torques_G)
+        self.opti.subject_to(ff_torque == ff_torque_G)
+        self.opti.subject_to(f_3z == f_3z_G)
+        self.opti.subject_to(m_3x == m_3x_G)
+        self.opti.subject_to(m_3y == m_3y_G)
+
+
+        # torques, ff_torque, v_3, f_3z, m_3x, m_3y = self.rnea_func(q_out, v, a, f_z, u, ca.DM(J_t))
 
         v_3x = ca.vertsplit(v_3)[0]
 
-        m_ya = self.w6_func(v_3)[-1]
+        m_ya = w6[-1] # self.w6_func(v_3)[-1]
 
         fz_ref = Vehicle._2d_list_to_SX(
             [[self.prop.t_Fznom[i]] * 2 for i in range(2)]
@@ -588,6 +631,7 @@ if __name__ == "__main__":
         ca.SX(np.zeros(foo.nv)),
         f_ext,
     )
+    print(len(torques))
     print(torques, torques[2])
     print(data.f[3])
 

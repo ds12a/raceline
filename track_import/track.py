@@ -462,7 +462,7 @@ class Track:
                 go.Scatter3d(
                     x=track[:, 0],
                     y=track[:, 1],
-                    z=track[:, 2],
+                    z=track[:, 2],  
                     name="line",
                     mode="lines",
                     line=dict(

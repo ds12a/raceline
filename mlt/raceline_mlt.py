@@ -142,7 +142,7 @@ class MLTCollocation(PSCollocation):
 
                 curvature[b[:, 2] < 0] *= -1
                 
-                v_guess = 30
+                v_guess = 20
                 # self.opti.set_initial(
                 #     Q_1_dot[k][:, :],
                 #     np.clip(v_guess, 5, 90) / self.track.length,
@@ -320,7 +320,7 @@ class MLTCollocation(PSCollocation):
 if __name__ == "__main__":
 
     config = {
-        # "track": "track_import/generated/circle.json",
+        # "track": "track_import/generated/cota_test.json",
         "track": "foo.json",
         "vehicle_properties": "mlt/vehicle_properties/DallaraAV24.yaml",
     }
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     track = None
     # zandvoort 90 4
     # 120 fails to solve but almost converges
-    for n in [120]:
+    for n in [200]:
         print(f"{n} segments")
         mlt = MLTCollocation(config)
         mr = MeshRefinement(mlt, r_config)
